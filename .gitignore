@@ -1,0 +1,14 @@
+*~
+\#*
+.#*
+*.o
+*.d
+cscope.out
+event-test
+avahi-test
+ts-test
+tv-test
+libev.a
+perf.data*
+ts-test.c
+tv-test.c
