@@ -13,6 +13,8 @@ static inline void us_to_ts(uint64_t us, struct timespec *ts)
 }
 
 void ts_normalize(struct timespec *ts);
+void ts_add(struct timespec *t1, const struct timespec *t2);
+void ts_subtract(struct timespec *t1, const struct timespec *t2);
 int ts_compare(const struct timespec *ts1, const struct timespec *ts2);
 void ts_sort(struct timespec **tss, size_t len);
 long ts_search(struct timespec *const *tvs, size_t len, struct timespec *new);

@@ -13,6 +13,8 @@ static inline void us_to_tv(uint64_t us, struct timeval *tv)
 }
 
 void tv_normalize(struct timeval *tv);
+void tv_add(struct timeval *t1, const struct timeval *t2);
+void tv_subtract(struct timeval *t1, const struct timeval *t2);
 int tv_compare(const struct timeval *tv1, const struct timeval *tv2);
 void tv_sort(struct timeval **tvs, size_t len);
 long tv_search(struct timeval *const *tvs, size_t len, struct timeval *new);

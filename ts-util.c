@@ -20,6 +20,22 @@ void ts_normalize(struct timespec *tv)
 	tv->tv_nsec = rem;
 }
 
+void ts_add(struct timespec *t1, const struct timespec *t2)
+{
+	t1->tv_sec += t2->tv_sec;
+	t1->tv_nsec += t2->tv_nsec;
+	ts_normalize(t1);
+	return;
+}
+
+void ts_subtract(struct timespec *t1, const struct timespec *t2)
+{
+	t1->tv_sec -= t2->tv_sec;
+	t1->tv_nsec -= t2->tv_nsec;
+	ts_normalize(t1);
+	return;
+}
+
 int ts_compare(const struct timespec *t1, const struct timespec *t2)
 {
 	if (t1->tv_sec < t2->tv_sec)
@@ -83,4 +99,5 @@ void ts_sort(struct timespec **tvs, size_t size)
 {
 	qsort(tvs, size, sizeof(struct timespec *),
 	      (int (*)(const void *, const void *))ts_compare_q);
+	return;
 }

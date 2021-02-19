@@ -15,6 +15,24 @@ void TT##_normalize(TYPE *tv)                   \
         tv->MEMB = rem;				\
 }
 
+#define T_SUB(TT, TYPE, MEMB)			\
+void TT##_subtract(TYPE *t1, const TYPE *t2)	\
+{						\
+	t1->tv_sec -= t2->tv_sec;		\
+	t1->MEMB -= t2->MEMB;			\
+	TT##_normalize(t1);			\
+	return;					\
+}
+
+#define T_ADD(TT, TYPE, MEMB)			\
+void TT##_add(TYPE *t1, const TYPE *t2)		\
+{						\
+	t1->tv_sec += t2->tv_sec;		\
+	t1->MEMB += t2->MEMB;			\
+	TT##_normalize(t1);			\
+	return;					\
+}
+
 #define T_COMPARE(TT, TYPE, MEMB) \
 int TT##_compare(const TYPE *t1, const TYPE *t2)        \
 {                                                       \
@@ -94,6 +112,8 @@ long TT##_insert(TYPE **tvs, size_t *len, size_t size, TYPE *new)\
 
 #define T_FUNCTIONS(TT, TYPE, MEMB, FACT)  \
         T_NORMALIZE(TT, TYPE, MEMB, FACT)  \
+        T_ADD(TT, TYPE, MEMB)              \
+        T_SUB(TT, TYPE, MEMB)              \
         T_COMPARE(TT, TYPE, MEMB)          \
         static T_COMPARE_Q(TT, TYPE)       \
         T_SEARCH(TT, TYPE)                 \
@@ -106,4 +126,3 @@ T_FUNCTIONS(tv, struct timeval, tv_usec, 1000000L)
 #if GEN_TS == 1
 T_FUNCTIONS(ts, struct timespec, tv_nsec, 1000000000L)
 #endif
-

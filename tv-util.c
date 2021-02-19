@@ -20,6 +20,22 @@ void tv_normalize(struct timeval *tv)
 	tv->tv_usec = rem;
 }
 
+void tv_add(struct timeval *t1, const struct timeval *t2)
+{
+	t1->tv_sec += t2->tv_sec;
+	t1->tv_usec += t2->tv_usec;
+	tv_normalize(t1);
+	return;
+}
+
+void tv_subtract(struct timeval *t1, const struct timeval *t2)
+{
+	t1->tv_sec -= t2->tv_sec;
+	t1->tv_usec -= t2->tv_usec;
+	tv_normalize(t1);
+	return;
+}
+
 int tv_compare(const struct timeval *t1, const struct timeval *t2)
 {
 	if (t1->tv_sec < t2->tv_sec)
@@ -82,4 +98,5 @@ void tv_sort(struct timeval **tvs, size_t size)
 {
 	qsort(tvs, size, sizeof(struct timeval *),
 	      (int (*)(const void *, const void *))tv_compare_q);
+	return;
 }
