@@ -317,7 +317,12 @@ void timeout_event(struct event *tmo_ev, uint32_t events)
 	}
 
 	if (read(tmo_ev->fd, &val, sizeof(val)) == -1)
-		msg(LOG_ERR, "failed to read timerfd: %m\n");
+		/*
+		 * EAGAIN happens if the most recent timer was cancelled
+		 * and the timer rearmed before we get here.
+		 */
+		msg(errno == EAGAIN ? LOG_DEBUG : LOG_ERR,
+		    "failed to read timerfd: %m\n");
 
 	if ((rc = clock_gettime(th->source, &now)) == -1)
 		return;
