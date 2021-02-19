@@ -25,14 +25,13 @@ struct itevent {
 };
 
 static void fini_cb(struct event __attribute__((unused)) *evt,
-		    int reason, uint32_t __attribute__((unused)) events)
+		    uint32_t __attribute__((unused)) events)
 {
-	msg(LOG_NOTICE, "%s\n", reason_str[reason]);
+	msg(LOG_NOTICE, "%s\n", reason_str[evt->reason]);
 	exit_main_loop();
 }
 
-static void mini_cb(struct event *evt, int reason,
-		    uint32_t __attribute__((unused)) events)
+static void mini_cb(struct event *evt, uint32_t __attribute__((unused)) events)
 {
 
 	uint64_t val;
@@ -40,8 +39,9 @@ static void mini_cb(struct event *evt, int reason,
 	struct itevent *itev = (struct itevent *)evt;
 	int rc;
 
-        log(LOG_NOTICE, "%d %d: %s\n", itev->instance, itev->count, reason_str[reason]);
-	if (reason == REASON_TIMEOUT) {
+        msg(LOG_NOTICE, "%d %d: %s\n", itev->instance, itev->count,
+	    reason_str[evt->reason]);
+	if (evt->reason == REASON_TIMEOUT) {
 		if (itev->count++ >= MAX_CALLS) {
 			event_remove(evt);
 			close(evt->fd);
@@ -49,9 +49,9 @@ static void mini_cb(struct event *evt, int reason,
 		}
 	} else {
 		if (read(evt->fd, &val, sizeof(val)) == -1)
-			log(LOG_ERR, "failed to read timerfd: %m\n");
+			msg(LOG_ERR, "failed to read timerfd: %m\n");
 		else
-			log(LOG_DEBUG, "read: %"PRIu64"\n", val);
+			msg(LOG_DEBUG, "read: %"PRIu64"\n", val);
 
 		if (itev->count++ >= MAX_CALLS) {
 			event_finished(evt);
@@ -62,7 +62,7 @@ static void mini_cb(struct event *evt, int reason,
 	evt->flags &= ~TMO_ABS;
 	new_tmo.tv_sec = random() % 4;
 	if ((rc = event_mod_timeout(evt, &new_tmo)) < 0 &&
-	    (reason != REASON_TIMEOUT || rc != -ENOENT))
+	    (evt->reason != REASON_TIMEOUT || rc != -ENOENT))
 		msg(LOG_ERR, "failed to set new timeout: %s\n", strerror(-rc));
 }
 
@@ -145,7 +145,7 @@ int main(void)
 		msg(LOG_WARNING, "unexpected exit from: %s\n", strerror(-rc));
 		return 1;
 	} else {
-		log(LOG_INFO, "exit signal received\n");
+		msg(LOG_INFO, "exit signal received\n");
 		return 0;
 	}
 }

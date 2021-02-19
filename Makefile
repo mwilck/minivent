@@ -6,7 +6,7 @@ EVENT-TEST_OBJS = main.o
 AVAHI-TEST_OBJS = avahi.o avahi-test.o
 TS-TEST_OBJS = ts-test.o
 TV-TEST_OBJS = tv-test.o
-OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS)
+OBJS = $(LIBEV_OBJS) $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS)
 
 $(LIB):	$(LIBEV_OBJS)
 	$(AR) r $@ $^

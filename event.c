@@ -70,6 +70,7 @@ int event_add(const struct dispatcher *dsp, struct event *evt)
 {
 	evt->ep.data.ptr = evt;
 	evt->dsp = dsp;
+	evt->reason = 0;
 	if (evt->fd != -1 &&
 	    epoll_ctl(dsp->epoll_fd, EPOLL_CTL_ADD, evt->fd, &evt->ep) == -1) {
 		msg(LOG_ERR, "failed to add event: %m\n");
@@ -111,6 +112,7 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 	int ep_fd = dispatcher_get_efd(dsp);
 	int rc, i;
 	struct epoll_event events[MAX_EVENTS];
+	struct epoll_event *tmo_event = NULL;
 
 	if (ep_fd < 0)
 		return ep_fd;
@@ -122,11 +124,28 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 		return -errno;
 	}
 
-	msg(LOG_DEBUG, "received %d events\n", rc);
+	msg(LOG_INFO, "received %d events\n", rc);
 	for (i = 0; i < rc; i++) {
 		struct event *ev = events[i].data.ptr;
 
-		ev->callback(ev, REASON_EVENT_OCCURED, events[i].events);
+		if (ev == dsp->timeout_event)
+			tmo_event = &events[i];
+		else {
+			ev->reason = REASON_EVENT_OCCURED;
+			ev->callback(ev, events[i].events);
+		}
+	}
+
+	if (tmo_event) {
+		struct event *ev = tmo_event->data.ptr;
+
+		ev->reason = REASON_EVENT_OCCURED;
+		ev->callback(ev, tmo_event->events);
+	}
+
+	for (i = 0; i < rc; i++) {
+		struct event *ev = events[i].data.ptr;
+		ev->reason = 0;
 	}
 
 	return rc;

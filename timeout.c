@@ -286,14 +286,22 @@ static void _timeout_run_callbacks(struct timespec **tss, long n)
                 struct event *evt;
 
                 evt = container_of(tss[i], struct event, tmo);
-                log(LOG_DEBUG, "calling callback %ld (%ld.%06ld)\n", i,
+		if (evt->reason != 0) {
+			msg(LOG_INFO, "skipping event: %s\n",
+			    reason_str[evt->reason]);
+			continue;
+		}
+
+                msg(LOG_DEBUG, "calling callback %ld (%ld.%06ld)\n", i,
                     tss[i]->tv_sec, tss[i]->tv_nsec / 1000);
 
-		evt->callback(evt, REASON_TIMEOUT, 0);
+		evt->reason =  REASON_TIMEOUT;
+		evt->callback(evt, 0);
+		evt->reason = 0;
         }
 }
 
-void timeout_event(struct event *tmo_ev, int reason, uint32_t events)
+void timeout_event(struct event *tmo_ev, uint32_t events)
 {
 	struct timeout_handler *th = container_of(tmo_ev, struct timeout_handler, ev);
         struct timespec now;
@@ -302,9 +310,9 @@ void timeout_event(struct event *tmo_ev, int reason, uint32_t events)
         long pos = th->len;
 	uint64_t val;
 
-	if (reason != REASON_EVENT_OCCURED || events & ~EPOLLIN) {
-		msg(LOG_WARNING, "unexpected reason %s events 0x%08x\n",
-		    reason_str[reason], events);
+	if (tmo_ev->reason != REASON_EVENT_OCCURED || events & ~EPOLLIN) {
+		msg(LOG_WARNING, "unexpected reason %s, events 0x%08x\n",
+		    reason_str[tmo_ev->reason], events);
 		return;
 	}
 

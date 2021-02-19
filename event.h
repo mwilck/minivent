@@ -34,10 +34,18 @@ enum {
  * Prototype for event callback.
  *
  * @evt: the event object which registered the callback
- * @reason: REASON_TIMEOUT or REASON_EVENT_OCCURED
  * @events: bit mask of epoll events (see epoll_ctl(2))
+ *
+ * In the callback, check event->reason to obtain the reason the
+ * callback was called for.
+ *
+ * NOTE: race conditions between timeout and event completion can't
+ * be fully avoided. Even if called with REASON_TIMEOUT, the callback
+ * should check whether an event might have arrived in the meantime,
+ * and in this case, handle the event as if it had arrived before
+ * the timeout.
  */
-typedef void (*cb_fn)(struct event *evt, int reason, uint32_t events);
+typedef void (*cb_fn)(struct event *evt, uint32_t events);
 
 /**
  * struct event - data structure for a generic event with timeout
@@ -50,6 +58,8 @@ typedef void (*cb_fn)(struct event *evt, int reason, uint32_t events);
  *      CAUTION: don't touch ep.data, it's used by the dispatcher internally.
  * @fd: the file desciptor to monitor. Use -1 (and fill in the tmo field)
  *      to create a timer.
+ *      Note: don't change the fd field after creating the event. In particular,
+ *      setting a positve fd after calling event_add with fd == -1 is not allowed.
  * @callback: the callback function to be called if the event occurs or
  *      times out. This field *must* be set.
  * @dispatcher: the dispatcher object to which this event belongs
@@ -58,7 +68,8 @@ typedef void (*cb_fn)(struct event *evt, int reason, uint32_t events);
  *      creates an event with no (=infinite) timeout.
  *      CAUTION: USED INTERNALLY. Do not change this any more after calling
  *      event_add(), after event_finish(), it may be set again. The field
- *      may be modified by the dispatcher code.
+ *      may be modified by the dispatcher code. To change the timeout,
+ *      call event_mod_timeout().
  * @flags: See above. Currently only @TMO_ABS is supported. This field may
  *      be used internally by the dispatcher, be sure to set or clear only
  *      public bits.
@@ -70,7 +81,8 @@ struct event {
 	cb_fn callback;
 	const struct dispatcher *dsp;
 	struct timespec tmo;
-	unsigned int flags;
+	unsigned short reason;
+	unsigned short flags;
 };
 
 /**
@@ -119,7 +131,7 @@ int event_finished(struct event *event);
  * @event: a previously added event structure
  *
  * Call this function to change the epoll events (event->ep.events).
- * By setting @ep.events = 0, the event is temporarily disabled and 
+ * By setting @ep.events = 0, the event is temporarily disabled and
  * can be re-enabled later. NOTE: this function doesn't disable an
  * active timeout; use event_mod_timeout() for that.
  *
