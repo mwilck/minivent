@@ -45,17 +45,17 @@ struct dispatcher *new_dispatcher(int clocksrc)
 		return NULL;
 
 	if ((dsp->epoll_fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
-		log(LOG_ERR, "epoll_create1: %m\n");
+		msg(LOG_ERR, "epoll_create1: %m\n");
 		return NULL;
 	}
 
 	if (!(dsp->timeout_event = new_timeout_event(clocksrc))) {
-		log(LOG_ERR, "failed to create timeout event: %m\n");
+		msg(LOG_ERR, "failed to create timeout event: %m\n");
 		return NULL;
 	}
 
 	if (event_add(dsp, dsp->timeout_event) != 0) {
-		log(LOG_ERR, "failed to dispatch timeout event: %m\n");
+		msg(LOG_ERR, "failed to dispatch timeout event: %m\n");
 		return NULL;
 	} else
 		return STEAL_PTR(dsp);
@@ -72,7 +72,7 @@ int event_add(const struct dispatcher *dsp, struct event *evt)
 	evt->dsp = dsp;
 	if (evt->fd != -1 &&
 	    epoll_ctl(dsp->epoll_fd, EPOLL_CTL_ADD, evt->fd, &evt->ep) == -1) {
-		log(LOG_ERR, "failed to add event: %m\n");
+		msg(LOG_ERR, "failed to add event: %m\n");
 		return -errno;
 	}
 	return timeout_add(dsp->timeout_event, evt);
@@ -117,12 +117,12 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 
 	rc = epoll_pwait(ep_fd, events, MAX_EVENTS, -1, sigmask);
 	if (rc == -1) {
-		log(errno == EINTR ? LOG_DEBUG : LOG_WARNING,
+		msg(errno == EINTR ? LOG_DEBUG : LOG_WARNING,
 		    "epoll_pwait: %m\n");
 		return -errno;
 	}
 
-	log(LOG_DEBUG, "received %d events\n", rc);
+	msg(LOG_DEBUG, "received %d events\n", rc);
 	for (i = 0; i < rc; i++) {
 		struct event *ev = events[i].data.ptr;
 

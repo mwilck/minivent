@@ -39,7 +39,7 @@ int log_level = DEFAULT_LOGLEVEL;
 bool log_timestamp;
 
 int __attribute__((format(printf, 3, 4)))
-__log(int lvl, const char *func __attribute__((unused)), const char *format, ...)
+__msg(int lvl, const char *func __attribute__((unused)), const char *format, ...)
 {
 	va_list ap;
 	int ret;

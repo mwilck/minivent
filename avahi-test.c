@@ -33,13 +33,13 @@ static void callback(AvahiWatch *w, int fd, AvahiWatchEvent event,
         char c;
 
         if ((r = read(fd, &c, 1)) <= 0) {
-		log(LOG_WARNING, "read() failed: %s\n",
+		msg(LOG_WARNING, "read() failed: %s\n",
 		    r < 0 ? strerror(errno) : "EOF");
 		api->watch_free(w);
             return;
         }
 
-        log(LOG_INFO, "Read: %c\n", c >= 32 && c < 127 ? c : '.');
+        msg(LOG_INFO, "Read: %c\n", c >= 32 && c < 127 ? c : '.');
     }
 }
 
@@ -48,7 +48,7 @@ static void wakeup(AvahiTimeout *t, AVAHI_GCC_UNUSED void *userdata)
     struct timeval tv;
     static unsigned i = 0;
 
-    log(LOG_INFO, "Wakeup #%u\n", i++);
+    msg(LOG_INFO, "Wakeup #%u\n", i++);
 
     if (i > 10)
 	    exit_main_loop();
@@ -67,7 +67,7 @@ int main(AVAHI_GCC_UNUSED int argc, AVAHI_GCC_UNUSED char *argv[])
     log_timestamp = true;
 
     if (init_signals() != 0) {
-	    log(LOG_ERR, "failed to set up signals: %m\n");
+	    msg(LOG_ERR, "failed to set up signals: %m\n");
 	    return 1;
     }
 
@@ -88,7 +88,7 @@ int main(AVAHI_GCC_UNUSED int argc, AVAHI_GCC_UNUSED char *argv[])
     sigdelset(&ep_mask, SIGTERM);
     sigdelset(&ep_mask, SIGINT);
 
-    log(LOG_NOTICE, "start\n");
+    msg(LOG_NOTICE, "start\n");
     event_loop(base, &ep_mask);
 
     avahi_mini_poll_free(ep);

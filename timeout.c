@@ -54,7 +54,7 @@ struct event *new_timeout_event(int source)
                 return NULL;
         th->ev.fd = timerfd_create(source, TFD_NONBLOCK|TFD_CLOEXEC);
         if (th->ev.fd == -1) {
-                log(LOG_ERR, "timerfd_create: %m\n");
+                msg(LOG_ERR, "timerfd_create: %m\n");
                 free(th);
                 return NULL;
         }
@@ -63,7 +63,7 @@ struct event *new_timeout_event(int source)
 	th->ev.ep.data.ptr = &th->ev;
 	th->ev.callback = timeout_event;
 
-	log(LOG_DEBUG, "done\n");
+	msg(LOG_DEBUG, "done\n");
         return &th->ev;
 }
 
@@ -78,12 +78,12 @@ static long _timeout_rearm(struct timeout_handler *th, long pos)
 	if (ts_compare(&it.it_value, &th->expiry) == 0)
 		return pos;
 
-        log(LOG_DEBUG, "current: %ld/%ld, expire: %ld.%06ld\n",
+        msg(LOG_DEBUG, "current: %ld/%ld, expire: %ld.%06ld\n",
             pos, th->len, it.it_value.tv_sec, it.it_value.tv_nsec / 1000L);
 
         rc = timerfd_settime(th->ev.fd, TFD_TIMER_ABSTIME, &it, NULL);
         if (rc == -1) {
-                log(LOG_ERR, "timerfd_settime: %m\n");
+                msg(LOG_ERR, "timerfd_settime: %m\n");
                 return -errno;
         } else {
 		th->expiry = it.it_value;
@@ -107,7 +107,7 @@ static long timeout_resize(struct timeout_handler *th, size_t size)
 		return 0;
 	}
 
-	log(LOG_DEBUG, "size old %zu new %zu\n", th->len, size);
+	msg(LOG_DEBUG, "size old %zu new %zu\n", th->len, size);
 	tmp = realloc(th->timeouts, size * sizeof(*th->timeouts));
 	if (tmp == NULL)
 		return -errno;
@@ -140,13 +140,13 @@ static int timeout_add_ev(struct timeout_handler *th, struct event *event)
 
 	for (pos = 0; pos < (long)th->len; pos++)
 		if (th->timeouts[pos] == &event->tmo) {
-			log(LOG_DEBUG, "event %p exists already at pos %ld/%zu\n",
+			msg(LOG_DEBUG, "event %p exists already at pos %ld/%zu\n",
 			    event, pos, th->len);
 			return -EEXIST;
 		};
 
 	if ((rc = timeout_resize(th, th->len + 1)) < 0) {
-		log(LOG_ERR, "failed to increase array size: %m\n");
+		msg(LOG_ERR, "failed to increase array size: %m\n");
 		return rc;
 	}
 
@@ -156,11 +156,11 @@ static int timeout_add_ev(struct timeout_handler *th, struct event *event)
 
         pos = ts_insert(th->timeouts, &th->len, th->len + 1, &event->tmo);
         if (pos < 0) {
-                log(LOG_ERR, "ts_insert failed: %m\n");
+                msg(LOG_ERR, "ts_insert failed: %m\n");
                 return errno ? -errno : -EIO;
         }
 
-        log(LOG_INFO, "new timeout at pos %ld/%ld: %ld.%06ld\n",
+        msg(LOG_INFO, "new timeout at pos %ld/%ld: %ld.%06ld\n",
             pos, th->len, event->tmo.tv_sec, event->tmo.tv_nsec / 1000L);
 
         if (pos == 0)
@@ -185,7 +185,7 @@ static int timeout_cancel_ev(struct timeout_handler *th, struct event *evt)
         for (pos = 0; pos < (long)th->len && ts != th->timeouts[pos]; pos++);
 
         if (pos == (long)th->len) {
-                log(LOG_INFO, "%p: not found\n", evt);
+                msg(LOG_INFO, "%p: not found\n", evt);
 		/*
 		 * This is normal if called from a timeout handler.
 		 * Mark the event as having no timeout.
@@ -194,7 +194,7 @@ static int timeout_cancel_ev(struct timeout_handler *th, struct event *evt)
                 return -ENOENT;
         }
 
-	log(LOG_INFO, "timeout %ld cancelled, %ld.%06ld\n",
+	msg(LOG_INFO, "timeout %ld cancelled, %ld.%06ld\n",
             pos, ts->tv_sec, ts->tv_nsec / 1000L);
 
 	*ts = null_ts;
@@ -243,7 +243,7 @@ int timeout_modify(struct event *tmo_event, struct event *evt, struct timespec *
 
         if (pos == (long)th->len || ts != th->timeouts[pos]) {
 		/* This is normal if timeout_modify called from timeout handler */
-                log(LOG_DEBUG, "%p: not found\n", evt);
+                msg(LOG_DEBUG, "%p: not found\n", evt);
                 evt->tmo = *new;
 		return timeout_add_ev(th, evt);
         }
@@ -266,7 +266,7 @@ int timeout_modify(struct event *tmo_event, struct event *evt, struct timespec *
 	} else
 		memmove(&th->timeouts[pnew + 1], &th->timeouts[pnew],
 			(pos - pnew)  * sizeof(*th->timeouts));
-	log(LOG_INFO, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
+	msg(LOG_INFO, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
             pos, pnew, ts->tv_sec, ts->tv_nsec / 1000L,
             new->tv_sec, new->tv_nsec / 1000L);
 
@@ -303,13 +303,13 @@ void timeout_event(struct event *tmo_ev, int reason, uint32_t events)
 	uint64_t val;
 
 	if (reason != REASON_EVENT_OCCURED || events & ~EPOLLIN) {
-		log(LOG_WARNING, "unexpected reason %s events 0x%08x\n",
+		msg(LOG_WARNING, "unexpected reason %s events 0x%08x\n",
 		    reason_str[reason], events);
 		return;
 	}
 
 	if (read(tmo_ev->fd, &val, sizeof(val)) == -1)
-		log(LOG_ERR, "failed to read timerfd: %m\n");
+		msg(LOG_ERR, "failed to read timerfd: %m\n");
 
 	if ((rc = clock_gettime(th->source, &now)) == -1)
 		return;

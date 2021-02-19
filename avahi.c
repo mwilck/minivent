@@ -118,7 +118,7 @@ watch_new(const AvahiPoll *api, int fd, AvahiWatchEvent events,
 static void
 watch_update(AvahiWatch *w, AvahiWatchEvent events)
 {
-	log(LOG_DEBUG, "called: %x\n", events);
+	msg(LOG_DEBUG, "called: %x\n", events);
 	w->ev.ep.events &= ~(EPOLLIN | EPOLLOUT);
 	if (events & AVAHI_WATCH_IN)
 		w->ev.ep.events |= EPOLLIN;
@@ -133,7 +133,7 @@ watch_get_events(AvahiWatch *w)
 {
 	AvahiWatchEvent events = 0;
 
-	log(LOG_DEBUG, "called\n");
+	msg(LOG_DEBUG, "called\n");
 	if (w->ev.ep.events & EPOLLIN)
 		events |= AVAHI_WATCH_IN;
 	if (w->ev.ep.events & EPOLLOUT)
@@ -147,7 +147,7 @@ watch_free(AvahiWatch *w)
 {
 	AvahiMiniPoll *ep = w->eventpoll;
 
-	log(LOG_DEBUG, "called\n");
+	msg(LOG_DEBUG, "called\n");
 	event_remove(&w->ev);
 
 	AVAHI_LLIST_REMOVE(AvahiWatch, watches, ep->watches, w);
@@ -162,7 +162,7 @@ timeout_cb(struct event *evt,
 	AvahiTimeout *t = container_of(evt, AvahiTimeout, ev);
 
 	assert(reason == REASON_TIMEOUT);
-	log(LOG_DEBUG, "called\n");
+	msg(LOG_DEBUG, "called\n");
 	t->cb(t, t->userdata);
 }
 
@@ -171,7 +171,7 @@ timeout_add(AvahiTimeout *t, const struct timeval *tv)
 {
 	AvahiMiniPoll *ep = t->eventpoll;
 
-	log(LOG_DEBUG, "called\n");
+	msg(LOG_DEBUG, "called\n");
 	t->ev.callback = timeout_cb;
 	t->ev.fd = -1;
 	t->ev.tmo.tv_sec = tv->tv_sec;

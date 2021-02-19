@@ -31,7 +31,7 @@ static int init_signals(void)
 static __attribute__((unused))
 void exit_main_loop(void)
 {
-        log(LOG_NOTICE, "sending exit signal\n");
+        msg(LOG_NOTICE, "sending exit signal\n");
         if (kill(getpid(), SIGINT) == -1)
-                log(LOG_ERR, "kill: %m\n");
+                msg(LOG_ERR, "kill: %m\n");
 }
