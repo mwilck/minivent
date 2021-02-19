@@ -24,6 +24,8 @@ static int init_signals(void)
 		return -errno;
 	if (sigaction(SIGINT, &sa, NULL) == -1)
 		return -errno;
+	if (sigaction(SIGALRM, &sa, NULL) == -1)
+		return -errno;
 	return 0;
 }
 
@@ -31,7 +33,7 @@ static int init_signals(void)
 static __attribute__((unused))
 void exit_main_loop(void)
 {
-        msg(LOG_NOTICE, "sending exit signal\n");
+        msg(LOG_INFO, "sending exit signal\n");
         if (kill(getpid(), SIGINT) == -1)
                 msg(LOG_ERR, "kill: %m\n");
 }
