@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: LGPL-2.1-or-newer
+ */
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>

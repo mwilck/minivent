@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: LGPL-2.1-or-newer
+ */
 #define T_NORMALIZE(TT, TYPE, MEMB, FACT)       \
 void TT##_normalize(TYPE *tv)                   \
 {                                               \

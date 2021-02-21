@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: GPL-2.0-or-newer
+ */
 #include <sys/types.h>
 #include <sys/timerfd.h>
 #include <inttypes.h>

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: GPL-2.0-or-newer
+ */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif

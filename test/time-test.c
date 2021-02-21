@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: GPL-2.1-or-newer
+ */
 #define NTV 1000
 #define NR 1000
 

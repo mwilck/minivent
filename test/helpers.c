@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021 Martin Wilck, SUSE LLC
+ * SPDX-License-Identifier: GPL-2.1-or-newer
+ */
 
 static sig_atomic_t must_exit;
 
