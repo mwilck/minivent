@@ -1,0 +1,60 @@
+default:
+  image: registry.suse.de/home/mwilck/images/sle-15-sp2/containers/minevent-test
+  tags:
+    - docker
+
+build:cov:
+  stage: build
+  script:
+    - make COV=1 test
+  artifacts:
+    paths:
+      - libev.a
+      - test/ts-test
+      - test/tv-test
+      - test/event-test
+      - ./*.gcno
+
+build:opt:
+  stage: build
+  script:
+    - make test
+  artifacts:
+    paths:
+      - libev.a
+      - test/ts-test
+      - test/tv-test
+      - test/event-test
+
+coverage:
+  stage: test
+  dependencies:
+    - build:cov
+  script:
+    - ./test/ts-test
+    - ./test/tv-test
+    - ./test/event-test -n 10 -t 10 -q
+    - ./test/event-test -n 1 -t 10 -s -q
+    - gcovr -r .
+  coverage: '/^TOTAL.*\s+(\d+\%)$/'
+
+valgrind:
+  stage: test
+  dependencies:
+    - build:opt
+  script:
+    - valgrind --leak-check=full ./test/ts-test
+    - valgrind --leak-check=full ./test/tv-test
+    - valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q
+
+tough:
+  stage: test
+  dependencies:
+    - build:opt
+  variables:
+    FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
+  script:
+    ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
+  retry: 1
+
+
