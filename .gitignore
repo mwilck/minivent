@@ -11,8 +11,6 @@ ts-test
 tv-test
 libev.a
 perf.data*
-ts-test.c
-tv-test.c
 *.gcno
 *.gcda
 *.gcov

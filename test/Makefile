@@ -34,6 +34,6 @@ tv-test.c:	time-test-inc.c time-test.c
 	$(CPP) -P -DGEN_TV=1 time-test.c | indent -linux >>$@
 
 clean:
-	$(RM) *.o event-test tu avahi-test ts-test tv-test ts-*.c tv-*.c *~ *.d
+	$(RM) *.o event-test tu avahi-test ts-test tv-test *~ *.d
 
 include $(wildcard $(OBJS:.o=.d))
