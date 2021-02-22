@@ -20,47 +20,29 @@ TT##_print(const TYPE *tv)                                           \
                 tv->tv_sec, tv->MEMB / (FACT / 1000000L));           \
 }
 
-#define T_TEST(TT, TYPE)                                                \
-void TT##_test(void)                                                    \
-{                                                                       \
-        int i;                                                          \
-                                                                        \
-        TYPE tv[NTV], tq[NTV];                                          \
-        TYPE *ptv[NTV], *qtv[NTV];					\
-        size_t ntv = 0;                                                 \
-                                                                        \
-        for (i = 0; i < NTV; i++) {                                     \
-                TT##_random(&tv[i]);                                    \
-                tq[i] = tv[i];                                          \
-                qtv[i] = &tq[i];                                        \
-                TT##_insert(ptv, &ntv, NTV, &tv[i]);			\
-        }                                                               \
-                                                                        \
-        for(i = 0; i < NTV; i++)                                        \
-                TT##_normalize(qtv[i]);                                 \
-                                                                        \
-        TT##_sort(qtv, NTV);                                            \
-                                                                        \
-        /* fprintf(stderr, "\nInsert:     ");	*/			\
-        for (i = 0; i < NTV; i++) {                                     \
-                /* TT##_print(ptv[i]); */				\
-		if (i > 0)						\
-			assert(TT##_compare(ptv[i-1], ptv[i]) <= 0);	\
-        }                                                               \
-									\
-        /* fprintf(stderr, "OK\nQsort:     ");	*/			\
-        for (i = 0; i < NTV; i++) {                                     \
-                /* TT##_print(qtv[i]);	*/				\
-		assert(TT##_compare(ptv[i], qtv[i]) == 0);		\
-        }                                                               \
-        /* fprintf(stderr, "OK\n");	*/				\
-}
+/*
+ * Array initialized with random values
+ * Duplicate values are highly unlikely
+ */
+#define INIT_NO_EQUALS				\
+	do {					\
+		tq[i] = tv[i];			\
+	} while (0)
 
-#define T_TEST1(TT, TYPE)                                               \
-void TT##_test1(void)                                                   \
+/*
+ * Array initialized with values drawn randomly from another array
+ * Duplicate values are highly likely
+ */
+#define INIT_WITH_EQUALS			\
+	do {					\
+		int j = random() % NTV;		\
+                tq[i] = tv[j];			\
+	} while (0)
+
+#define __T_TEST(TT, TYPE, NAME, INIT)					\
+int TT##_##NAME(void)                                                   \
 {                                                                       \
-        int i;                                                          \
-                                                                        \
+        int i, errors = 0;						\
         TYPE tv[NTV], tq[NTV];                                          \
         TYPE *ptv[NTV], *qtv[NTV];					\
         size_t ntv = 0;                                                 \
@@ -69,8 +51,7 @@ void TT##_test1(void)                                                   \
                 TT##_random(&tv[i]);                                    \
 	}								\
         for (i = 0; i < NTV; i++) {                                     \
-		int j = random() % NTV;					\
-                tq[i] = tv[j];                                          \
+		INIT;							\
 	}								\
         for (i = 0; i < NTV; i++) {                                     \
 		tv[i] = tq[i];						\
@@ -84,19 +65,21 @@ void TT##_test1(void)                                                   \
                                                                         \
         TT##_sort(qtv, NTV);                                            \
                                                                         \
-        /* fprintf(stderr, "\nInsert:     ");	*/			\
         for (i = 0; i < NTV; i++) {                                     \
-                /* TT##_print(ptv[i]); */				\
-		if (i > 0)						\
-			assert(TT##_compare(ptv[i-1], ptv[i]) <= 0);	\
+		if (i > 0 && TT##_compare(ptv[i-1], ptv[i]) > 0)	\
+			errors++;					\
         }                                                               \
-        /* fprintf(stderr, "OK\nQsort:     ");	*/			\
+									\
         for (i = 0; i < NTV; i++) {                                     \
-                /* TT##_print(qtv[i]);	*/				\
-		assert(TT##_compare(ptv[i], qtv[i]) == 0);		\
+		if (TT##_compare(ptv[i], qtv[i]) != 0)			\
+			errors++;					\
         }                                                               \
-        /* fprintf(stderr, "OK\n");	*/				\
+									\
+	return errors;							\
 }
+
+#define T_TEST(TT, TYPE) __T_TEST(TT, TYPE, test, INIT_NO_EQUALS)
+#define T_TEST1(TT, TYPE) __T_TEST(TT, TYPE, test1, INIT_WITH_EQUALS)
 
 #define TEST_FUNCTIONS(TT, TYPE, MEMB, FACT)        \
         static T_RANDOM(TT, TYPE, MEMB);            \
@@ -113,20 +96,22 @@ TEST_FUNCTIONS(ts, struct timespec, tv_nsec, 1000000000L);
 
 int main(void)
 {
-        int i;
+        int i, n_err = 0;
 
 #if GEN_TV == 1
         for (i = 0; i < NR; i++)
-                tv_test();
+                n_err += tv_test();
         for (i = 0; i < NR; i++)
-                tv_test1();
+                n_err += tv_test1();
 #endif
 #if GEN_TS == 1
         for (i = 0; i < NR; i++)
-                ts_test();
+                n_err += ts_test();
         for (i = 0; i < NR; i++)
-                ts_test1();
+                n_err += ts_test1();
 #endif
-	fprintf(stderr, "TESTS SUCCESSFUL (#items: %d, #runs: %d)\n", NTV, NR);
-        return 0;
+	fprintf(stderr, "TESTS FINISHED, %d errors (#items: %d, #runs: %d)\n",
+		n_err, NTV, NR);
+
+        return n_err ? 1 : 0;
 }
