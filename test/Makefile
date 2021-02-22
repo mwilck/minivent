@@ -1,10 +1,11 @@
+CFLAGS += -I.. $(COMMON_CFLAGS)
+
 LIB := ../libev.a
 EVENT-TEST_OBJS = event-test.o
 AVAHI-TEST_OBJS = avahi.o avahi-test.o
 TS-TEST_OBJS = ts-test.o
 TV-TEST_OBJS = tv-test.o
 OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS)
-CFLAGS += -I..
 
 all:	event-test ts-test tv-test avahi-test
 

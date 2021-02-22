@@ -1,5 +1,17 @@
-CFLAGS += "-DLOG_CLOCK=CLOCK_REALTIME" -DLOG_FUNCNAME=1 -O2 -g -Wall -Wextra -MMD -MP
-export CFLAGS
+ifeq ($(COV),1)
+OPTFLAGS := -O0
+COV_CFLAGS += -fprofile-arcs -ftest-coverage -fPIC
+LDFLAGS += -fprofile-arcs
+else
+OPTFLAGS := -O2
+endif
+WARNFLAGS := -Wall -Wextra -Werror
+COMMON_CFLAGS += $(OPTFLAGS)
+COMMON_CFLAGS += "-DLOG_CLOCK=CLOCK_REALTIME" -DLOG_FUNCNAME=1 -g -std=gnu99 $(WARNFLAGS) -MMD -MP
+export COMMON_CFLAGS
+export LDFLAGS
+CFLAGS += $(COMMON_CFLAGS) $(COV_CFLAGS)
+
 LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o log.o
 LIB := libev.a
 OBJS = $(LIBEV_OBJS)
@@ -24,7 +36,6 @@ test:	$(LIB)
 
 clean:
 	$(MAKE) -C test clean
-	$(RM) *.o *~ $(LIB) *.d
-	$(RM) -r *.d
+	$(RM) *.o *~ $(LIB) *.d *.gcno *.gcda *.gcov
 
 include $(wildcard $(OBJS:.o=.d))

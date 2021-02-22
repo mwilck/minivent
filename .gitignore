@@ -3,6 +3,7 @@
 .#*
 *.o
 *.d
+cscope.files
 cscope.out
 event-test
 avahi-test
@@ -12,3 +13,6 @@ libev.a
 perf.data*
 ts-test.c
 tv-test.c
+*.gcno
+*.gcda
+*.gcov
