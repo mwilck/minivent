@@ -54,7 +54,7 @@ static void start_event_1(int i __attribute__((unused)),
 	ts_normalize(&it->it_interval);
 }
 
-/* 1, 2, 3, or 4 s */
+/* 1, 2, or 3 s, or 0 (no timeout) */
 static void new_timeout_1(struct timespec *ts,
 			  unsigned short *flags __attribute__((unused)))
 {
@@ -84,6 +84,11 @@ static void new_timeout_2(struct timespec *ts,
 {
 	ts->tv_sec = 1;
 	ts->tv_nsec = random() % 1000000000L;
+}
+
+static void disable_2(bool *disabled)
+{
+	*disabled = (random() % 10 == 0);
 }
 
 /*
@@ -143,7 +148,9 @@ struct itevent {
 	double deviation, max_deviation, sq_deviation;
 	int expect;
 	struct timespec expected;
+	bool disabled;
 	void (*new_timeout)(struct timespec *, unsigned short *);
+	void (*disable)(bool *);
 };
 
 static void evaluate(struct itevent *it,
@@ -204,6 +211,7 @@ static void test_cb(struct event *evt, uint32_t __attribute__((unused)) events)
 	int rc;
 	char tb0[24], tb1[24], tb2[24];
 	unsigned short reason = evt->reason;
+	bool disabled = false;
 
 	itev->count++;
 	clock_gettime(dispatcher_get_clocksource(evt->dsp), &now);
@@ -272,13 +280,35 @@ check_timer:
 		goto check_timer;
 	}
 
+	if (itev->disable)
+		itev->disable(&disabled);
+	if (disabled != itev->disabled) {
+		msg(LOG_NOTICE, "%d %sabling event\n",
+		    itev->instance, disabled ? "dis" : "en");
+		itev->e.ep.events = disabled ? 0 : EPOLLIN;
+		if (event_modify(&itev->e) == 0)
+			itev->disabled = disabled;
+		else {
+			msg(LOG_ERR, "ERROR: event_modify: %m\n");
+			itev->err_count++;
+		}
+	}
+
 	itev->new_timeout(&new_tmo, &evt->flags);
 	ts_normalize(&new_tmo);
+
+	/* Avoid both timout and event being disabled */
+	if (itev->disabled && ts_compare(&new_tmo, &null_ts) == 0) {
+		msg(LOG_WARNING, "%d overriding timeout for disabled event\n",
+		    itev->instance);
+		new_tmo.tv_sec++;
+	}
 
 	if (!(evt->flags & TMO_ABS)) {
 		itev->expected = now;
 		if (ts_compare(&new_tmo, &null_ts) == 0 ||
-		    ts_compare(&cur.it_value, &new_tmo) <= 0) {
+		    (!itev->disabled &&
+		     ts_compare(&cur.it_value, &new_tmo) <= 0)) {
 			ts_add(&itev->expected, &cur.it_value);
 			itev->expect = REASON_EVENT_OCCURED;
 		} else {
@@ -288,7 +318,8 @@ check_timer:
 	} else {
 		ts_add(&cur.it_value, &now);
 		if (ts_compare(&new_tmo, &null_ts) == 0 ||
-		    ts_compare(&cur.it_value, &new_tmo) <= 0) {
+		    (!itev->disabled &&
+		     ts_compare(&cur.it_value, &new_tmo) <= 0)) {
 			itev->expected = cur.it_value;
 			itev->expect = REASON_EVENT_OCCURED;
 		} else {
@@ -299,7 +330,7 @@ check_timer:
 	msg(LOG_INFO, "%d: expecting %s @%s (ev %s tmo %s)\n",
 	    itev->instance, reason_str[itev->expect],
 	    format_ts(&itev->expected, tb0, sizeof(tb0)),
-	    format_ts(&cur.it_value, tb1, sizeof(tb1)),
+	    itev->disabled ? "disabled" : format_ts(&cur.it_value, tb1, sizeof(tb1)),
 	    format_ts(&new_tmo, tb2, sizeof(tb2)));
 
 	if ((rc = event_mod_timeout(evt, &new_tmo)) < 0 &&
@@ -342,7 +373,8 @@ static void cleanup_event(struct event ***ev)
 
 static int do_test(const char *name,
 		   void (*start_times)(int i, struct itimerspec *, unsigned short *),
-		   void (*new_timeout)(struct timespec *, unsigned short *))
+		   void (*new_timeout)(struct timespec *, unsigned short *),
+		   void (*disable)(bool*))
 {
 	struct itevent *itev __attribute__((cleanup(cleanup_itevent))) = NULL;
 	struct event **evt __attribute__((cleanup(cleanup_event))) = NULL;;
@@ -398,6 +430,7 @@ static int do_test(const char *name,
 		}
 		itev[i].instance = i;
 		itev[i].new_timeout = new_timeout;
+		itev[i].disable = disable;
 		evt[i] = &itev[i].e;
 		msg(LOG_INFO, "event %d: start %s (%s), interval %s\n",
 		    itev[i].instance,
@@ -573,8 +606,8 @@ int main(int argc, char *const argv[])
 	if (sched_setscheduler(0, SCHED_FIFO, &sp) == -1)
 		msg(LOG_WARNING, "failed to set SCHED_FIFO: %m\n");
 
-	rc += do_test("test 1", start_event_1, new_timeout_1);
-	rc += do_test("test 2", start_event_2, new_timeout_2);
-	rc += do_test("test 3", start_event_3, new_timeout_3);
+	rc += do_test("test 1", start_event_1, new_timeout_1, NULL);
+	rc += do_test("test 2", start_event_2, new_timeout_2, disable_2);
+	rc += do_test("test 3", start_event_3, new_timeout_3, disable_2);
 	return rc ? 1 : 0;
 }
