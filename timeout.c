@@ -260,22 +260,27 @@ int timeout_modify(struct event *tmo_event, struct event *evt, struct timespec *
 	if (pnew < 0)
 		return pnew;
 
-	if (pnew >= pmin && pnew <= pos)
-		; /* position hasn't changed */
-	else if (pnew > pos) {
-		/* subtract 1, because pnew is after pos but pos will be moved away */
+	if (pnew > pos + 1) {
+		/*
+		 * ts_search returns the position (pnew) at which the new tmo would be
+		 * inserted. All members at pnew or higher are >= new.
+		 * So if pnew = pos + 1, nothing needs to be done.
+		 * Subtract 1, because pnew is after pos but pos will be moved away.
+		 */
 		pnew--;
 		memmove(&th->timeouts[pos], &th->timeouts[pos + 1],
 			(pnew - pos)  * sizeof(*th->timeouts));
-	} else
+		th->timeouts[pnew] = &evt->tmo;
+	} else if (pnew < pos) {
 		memmove(&th->timeouts[pnew + 1], &th->timeouts[pnew],
 			(pos - pnew)  * sizeof(*th->timeouts));
+		th->timeouts[pnew] = &evt->tmo;
+	}
 	msg(LOG_INFO, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
             pos, pnew, ts->tv_sec, ts->tv_nsec / 1000L,
             new->tv_sec, new->tv_nsec / 1000L);
-
 	evt->tmo = *new;
-	th->timeouts[pnew] = &evt->tmo;
+
 
         if (pnew == 0)
                 _timeout_rearm(th, 0);
