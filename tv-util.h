@@ -5,6 +5,12 @@
 #ifndef _TV_UTIL_H
 #define _TV_UTIL_H
 
+/*
+ * Utility functions for dealing with "struct timeval".
+ * See also ts_util.h, which has the same set of functions
+ * for "struct timespec", with more detailed documentation.
+ */
+
 static inline uint64_t tv_to_us(const struct timeval *ts)
 {
 	return ts->tv_sec * 1000000ULL + ts->tv_usec;
