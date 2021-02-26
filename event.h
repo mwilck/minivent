@@ -8,6 +8,9 @@
 
 /**
  * reason codes for event callback function
+ * @REASON_EVENT_OCCURED: the event has occured
+ * @REASON_TIMEOUT: the timeout has expired
+ * @REASON_CLEANUP: dispatcher is about to exit
  */
 enum {
 	REASON_EVENT_OCCURED,
@@ -44,12 +47,26 @@ enum {
  * callback was called for.
  *
  * NOTE: race conditions between timeout and event completion can't
- * be fully avoided. Even if called with REASON_TIMEOUT, the callback
+ * be fully avoided. Even if called with @REASON_TIMEOUT, the callback
  * should check whether an event might have arrived in the meantime,
  * and in this case, handle the event as if it had arrived before
  * the timeout.
+ *
  */
 typedef void (*cb_fn)(struct event *evt, uint32_t events);
+
+/**
+ * Prototype for cleanup callback.
+ *
+ * If this callback is called, the event has already been
+ * removed from the dispatcher's internal lists, no need to call
+ * event_finished() any more. Closing the event's fd and possibly
+ * deallocating the event is the purpose of the callback. It's fine for
+ * the callback to free() the pointer passed to it.
+ *
+ * @evt: the event object which registered the callback
+ */
+typedef void (*cleanup_fn)(struct event *evt);
 
 /**
  * struct event - data structure for a generic event with timeout
@@ -82,11 +99,12 @@ typedef void (*cb_fn)(struct event *evt, uint32_t events);
 struct event {
 	struct epoll_event ep;
 	int fd;
-	cb_fn callback;
-	const struct dispatcher *dsp;
-	struct timespec tmo;
 	unsigned short reason;
 	unsigned short flags;
+	struct dispatcher *dsp;
+	struct timespec tmo;
+	cb_fn callback;
+	cleanup_fn cleanup;
 };
 
 /**
@@ -97,7 +115,7 @@ struct event {
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  */
-int event_add(const struct dispatcher *dsp, struct event *event);
+int event_add(struct dispatcher *dsp, struct event *event);
 
 /**
  * event_remove() - remove the event from epoll.
@@ -215,7 +233,23 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 	       int (*err_handler)(int err));
 
 /**
+ * cleanup_dispatcher() - clean out all events and timeouts 
+ * @dsp: a pointer returned by new_dispatcher().
+ *
+ * Remove all events and timeouts, and call every event's callback
+ * with the reason  code set to REASON_CLEANUP. The dispatcher object
+ * itself remains intact, and can be re-used by adding new events.
+ *
+ * Return: 0 on success, negative error code (-errno) on failure.
+ */
+int cleanup_dispatcher(struct dispatcher *dsp);
+
+/**
  * free_dispatcher() - free a dispatcher object.
+ * @dsp: a pointer returned by new_dispatcher().
+ *
+ * This function calls cleanup_dispatcher() before freeing the data
+ * structures of the dispatcher.
  */
 void free_dispatcher(struct dispatcher *dsp);
 

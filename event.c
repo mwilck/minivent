@@ -18,10 +18,14 @@
 
 /* size of events array in call to epoll_pwait() */
 #define MAX_EVENTS 8
+#define LEN_CHUNK 8
 
 struct dispatcher {
 	int epoll_fd;
+	bool exiting;
 	struct event *timeout_event;
+	unsigned int len, n, free;
+	struct event **events;
 };
 
 const char * const reason_str[__MAX_CALLBACK_REASON] = {
@@ -29,10 +33,176 @@ const char * const reason_str[__MAX_CALLBACK_REASON] = {
 	[REASON_TIMEOUT] = "timeout",
 };
 
+static int _dispatcher_increase(struct dispatcher *dsp)
+{
+	struct event **new;
+
+	if (dsp->len >= UINT_MAX - LEN_CHUNK)
+		return -EOVERFLOW;
+	new = realloc(dsp->events, (dsp->len + LEN_CHUNK) * sizeof(*new));
+	if (!new)
+		return -ENOMEM;
+	dsp->len += LEN_CHUNK;
+	dsp->events = new;
+	msg(LOG_DEBUG, "new size: %u\n", dsp->len);
+	return 0;
+}
+
+static unsigned int _dispatcher_find(const struct dispatcher *dsp,
+				     const struct event *evt)
+{
+	unsigned int i;
+
+	for (i = 0; i < dsp->n; i++)
+		if (dsp->events[i] == evt)
+			return i;
+	return UINT_MAX;
+}
+
+static int _dispatcher_add(struct dispatcher *dsp, struct event *evt)
+{
+	unsigned int i;
+	int rc;
+
+	if (_dispatcher_find(dsp, evt) != UINT_MAX)
+		return -EEXIST;
+
+	if (dsp->free > 0) {
+		for (i = 0; i < dsp->n; i++) {
+			if (dsp->events[i] == NULL)
+				break;
+		}
+		if (i == dsp->n) {
+			msg(LOG_WARNING, "free=%u, but no empty slot found\n",
+			    dsp->free);
+			dsp->free = 0;
+		} else {
+			dsp->events[i] = evt;
+			dsp->free--;
+			msg(LOG_DEBUG, "new event @%u, %u/%u/%u free\n",
+			    i, dsp->free, dsp->n, dsp->len);
+			return 0;
+		}
+	}
+
+	if (dsp->len == dsp->n)
+		if ((rc = _dispatcher_increase(dsp)) < 0)
+			return rc;
+
+	dsp->events[dsp->n] = evt;
+	dsp->n++;
+	msg(LOG_DEBUG, "new event @%u, %u/%u/%u free\n",
+	    dsp->n, dsp->free, dsp->n, dsp->len);
+	return 0;
+}
+
+static int _dispatcher_gc(struct dispatcher *dsp) {
+	unsigned int i, n;
+        struct event **new;
+
+	if (dsp->free <= dsp->len / 4)
+		return 0;
+
+	n = dsp->n;
+	for (i = n; i > 0; i--) {
+		unsigned int j;
+
+		if (dsp->events[i - 1] != NULL)
+			continue;
+
+		for (j = i - 1; j > 0; j--)
+			if (dsp->events[j - 1] != NULL)
+				break;
+
+		memmove(&dsp->events[j], &dsp->events[i],
+			(dsp->n - i) * sizeof(*dsp->events));
+
+		n -= (i - j);
+		if (j == 0)
+			break;
+		else
+			i = j;
+	}
+
+	if (dsp->n - n  != dsp->free)
+		msg(LOG_ERR, "error: %u != %u\n", dsp->free, dsp->n - n);
+	else {
+		msg(LOG_DEBUG, "collected %u slots\n", dsp->free);
+		dsp->n = n;
+		dsp->free = 0;
+	}
+
+	for (i = 0; i < dsp->n; i++) {
+		if (dsp->events[i] == NULL)
+			msg(LOG_ERR, "error at %u\n", i);
+	}
+
+	if (dsp->len <= 2 * LEN_CHUNK || dsp->n >= dsp->len / 2)
+		return 0;
+
+	new = realloc(dsp->events, (dsp->len / 2) * sizeof(*new));
+	if (!new)
+		return -ENOMEM;
+	dsp->events = new;
+	dsp->len = dsp->len / 2;
+
+	msg(LOG_NOTICE, "new size: %u/%u\n", dsp->n, dsp->len);
+	return 0;
+}
+
+static int _dispatcher_remove(struct dispatcher *dsp, struct event *ev)
+{
+	unsigned int i;
+
+	if ((i = _dispatcher_find(dsp, ev)) == UINT_MAX) {
+		msg(LOG_NOTICE, "event not found\n");
+		return -ENOENT;
+	}
+
+	dsp->events[i] = NULL;
+	if (i == dsp->n - 1)
+		dsp->n--;
+	else
+		dsp->free++;
+
+	msg(LOG_DEBUG, "removed event @%u, %u/%u/%u free\n",
+	    i, dsp->free, dsp->n, dsp->len);
+
+	return _dispatcher_gc(dsp);
+}
+
+int cleanup_dispatcher(struct dispatcher *dsp)
+{
+	unsigned int i;
+
+	if (dsp->exiting)
+		return 0;
+	dsp->exiting = true;
+
+	for (i = 0; i < dsp->n; i++) {
+		struct event *evt = dsp->events[i];
+
+		if (!evt)
+			continue;
+
+		dsp->events[i] = NULL;
+		timeout_cancel(dsp->timeout_event, evt);
+		epoll_ctl(dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+		if (evt->cleanup)
+			evt->cleanup(evt);
+	}
+	free(dsp->events);
+	dsp->events = NULL;
+	dsp->len = dsp->n = dsp->free = 0;
+	dsp->exiting = false;
+	return 0;
+}
+
 void free_dispatcher(struct dispatcher *dsp)
 {
 	if (!dsp)
 		return;
+	cleanup_dispatcher(dsp);
 	if (dsp->timeout_event)
 		free_timeout_event(dsp->timeout_event);
 	if (dsp->epoll_fd != -1)
@@ -41,6 +211,7 @@ void free_dispatcher(struct dispatcher *dsp)
 }
 
 static DEFINE_CLEANUP_FUNC(free_dsp_p, struct dispatcher *, free_dispatcher);
+static int _event_add(struct dispatcher *dsp, struct event *evt);
 
 struct dispatcher *new_dispatcher(int clocksrc)
 {
@@ -60,7 +231,8 @@ struct dispatcher *new_dispatcher(int clocksrc)
 		return NULL;
 	}
 
-	if (event_add(dsp, dsp->timeout_event) != 0) {
+	/* Don't use event_add() here, timeout is tracked separately */
+	if (_event_add(dsp, dsp->timeout_event) != 0) {
 		msg(LOG_ERR, "failed to dispatch timeout event: %m\n");
 		return NULL;
 	} else
@@ -74,19 +246,31 @@ int dispatcher_get_efd(const struct dispatcher *dsp)
 	return dsp->epoll_fd;
 }
 
-int event_add(const struct dispatcher *dsp, struct event *evt)
+static int _event_add(struct dispatcher *dsp, struct event *evt)
 {
-	if (!dsp || !evt || !evt->callback)
-		return -EINVAL;
 	evt->ep.data.ptr = evt;
-	evt->dsp = dsp;
-	evt->reason = 0;
 	if (evt->fd != -1 &&
 	    epoll_ctl(dsp->epoll_fd, EPOLL_CTL_ADD, evt->fd, &evt->ep) == -1) {
 		msg(LOG_ERR, "failed to add event: %m\n");
+		_dispatcher_remove(evt->dsp, evt);
 		return -errno;
 	}
+	evt->dsp = dsp;
+	evt->reason = 0;
 	return timeout_add(dsp->timeout_event, evt);
+}
+
+int event_add(struct dispatcher *dsp, struct event *evt)
+{
+	int rc;
+
+	if (!dsp || !evt || !evt->callback)
+		return -EINVAL;
+	if (dsp->exiting)
+		return -EBUSY;
+	if ((rc = _dispatcher_add(dsp, evt)) < 0)
+		return rc;
+	return _event_add(dsp, evt);
 }
 
 int event_remove(struct event *evt)
@@ -95,7 +279,12 @@ int event_remove(struct event *evt)
 
 	if (!evt || !evt->dsp)
 		return -EINVAL;
+	if (!evt->dsp)
+		return -EINVAL;
+	if (evt->dsp->exiting)
+		return 0;
 
+	_dispatcher_remove(evt->dsp, evt);
 	rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
 
 	return rc == -1 ? -errno : 0;
@@ -105,14 +294,24 @@ int event_finished(struct event *evt)
 {
 	if (!evt->dsp)
 		return -EINVAL;
+	if (evt->dsp->exiting)
+		return 0;
 	timeout_cancel(evt->dsp->timeout_event, evt);
 	return event_remove(evt);
 }
 
 int event_mod_timeout(struct event *evt, struct timespec *tmo)
 {
+	unsigned int i;
+
 	if (!evt || !evt->dsp || !tmo)
 		return -EINVAL;
+	if (evt->dsp->exiting)
+		return -EBUSY;
+	if ((i = _dispatcher_find(evt->dsp, evt)) == UINT_MAX) {
+		msg(LOG_WARNING, "attempt to modify non-existing event\n");
+		return -EEXIST;
+	}
 
 	return timeout_modify(evt->dsp->timeout_event, evt, tmo);
 }
@@ -120,12 +319,18 @@ int event_mod_timeout(struct event *evt, struct timespec *tmo)
 int event_modify(struct event *evt)
 {
 	int rc;
+	unsigned int i;
 
 	if (!evt || !evt->dsp)
 		return -EINVAL;
+	if (evt->dsp->exiting)
+		return -EBUSY;
+	if ((i = _dispatcher_find(evt->dsp, evt)) == UINT_MAX) {
+		msg(LOG_WARNING, "attempt to modify non-existing event\n");
+		return -EEXIST;
+	}
 	rc= epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_MOD,
 			   evt->fd, &evt->ep);
-
 	return rc == -1 ? -errno : 0;
 }
 
@@ -138,6 +343,8 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 
 	if (!dsp)
 		return -EINVAL;
+	if (dsp->exiting)
+		return -EBUSY;
 	if (ep_fd < 0)
 		return ep_fd;
 
