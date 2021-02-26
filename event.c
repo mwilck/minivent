@@ -155,13 +155,16 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 	return rc;
 }
 
-int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask)
+int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
+	       int (*err_handler)(int err))
 {
 	int rc;
 
-	do
+	do {
 		rc = event_wait(dsp, sigmask);
-	while (rc >= 0);
+		if (rc < 0 && err_handler)
+			rc = err_handler(-errno);
+	} while (rc > 0);
 
 	return rc >= 0 ? 0 : rc;
 }

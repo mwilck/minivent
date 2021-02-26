@@ -93,7 +93,7 @@ int main(AVAHI_GCC_UNUSED int argc, AVAHI_GCC_UNUSED char *argv[])
     sigdelset(&ep_mask, SIGINT);
 
     msg(LOG_NOTICE, "start\n");
-    event_loop(base, &ep_mask);
+    event_loop(base, &ep_mask, NULL);
 
     avahi_mini_poll_free(ep);
     free_dispatcher(base);

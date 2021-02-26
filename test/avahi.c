@@ -12,16 +12,16 @@
 #include <avahi-common/timeval.h>
 #include <avahi-common/watch.h>
 
-#include "log.h"
-#include "event.h"
+#include "../log.h"
+#include "../event.h"
 #include "avahi.h"
+#include "../util.h"
 
 #ifndef HOST_NAME_MAX
 # include <limits.h>
 # define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
 #endif
 
-#define container_of(X, TYPE, ELEM) ((TYPE *)((void *)(X) - offsetof(TYPE, ELEM)))
 static const struct timespec null_ts = { .tv_sec = 0, };
 
 typedef struct AvahiWatch {

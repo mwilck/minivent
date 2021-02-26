@@ -461,7 +461,7 @@ static int do_test(const char *name,
 	msg(LOG_NOTICE, "%s: started @%s, #events=%d, duration: %ds\n",
 	    name, format_ts(&start_ts, tb0, sizeof(tb0)), n_events, runtime);
 
-	rc = event_loop(dsp, &ep_mask);
+	rc = event_loop(dsp, &ep_mask, NULL);
 
 	if (rc != -EINTR || !must_exit) {
 		msg(LOG_WARNING, "unexpected exit from: %s\n", strerror(-rc));

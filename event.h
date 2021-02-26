@@ -198,14 +198,21 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
  *
  * @dispatcher: a dispatcher object
  * @sigmask: set of signals to be blocked while waiting
+ * @err_handler: callback for event_wait
  *
- * This function calls event_wait() in a loop, and returns if event_wait()
- * returns an error code.
+ * This function calls event_wait() in a loop, and calls err_handler() if
+ * event_wait() returns an error code, passing it the negative error code
+ * (e.g. -EINTR) in the @err parameter. err_handler() should return 0 (success)
+ * or a negative error code to make event_loop() return, and a positve number
+ * if event_loop should continue execution.
+ * @err_handler may be NULL, in which case event_loop() will simply return
+ * the error code from event_wait().
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  * In particular, it returns -EINTR if interrupted by caught signal.
  */
-int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask);
+int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
+	       int (*err_handler)(int err));
 
 /**
  * free_dispatcher() - free a dispatcher object.
