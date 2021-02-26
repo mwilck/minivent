@@ -12,7 +12,7 @@ export COMMON_CFLAGS
 export LDFLAGS
 CFLAGS += $(COMMON_CFLAGS) $(COV_CFLAGS)
 
-LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o log.o
+LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o log.o cleanup.o
 LIB := libev.a
 OBJS = $(LIBEV_OBJS)
 

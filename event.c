@@ -8,8 +8,11 @@
 #include <sys/epoll.h>
 #include <stdbool.h>
 #include <syslog.h>
+#include <string.h>
+#include <limits.h>
 #include "log.h"
 #include "util.h"
+#include "cleanup.h"
 #include "event.h"
 #include "timeout.h"
 
@@ -35,14 +38,11 @@ void free_dispatcher(struct dispatcher *dsp)
 	free(dsp);
 }
 
-static void free_dsp(struct dispatcher **dsp) {
-	if (*dsp)
-		free_dispatcher(*dsp);
-}
+static DEFINE_CLEANUP_FUNC(free_dsp_p, struct dispatcher *, free_dispatcher);
 
 struct dispatcher *new_dispatcher(int clocksrc)
 {
-	struct dispatcher *dsp __attribute__((cleanup(free_dsp))) = NULL;
+	struct dispatcher *dsp __cleanup__(free_dsp_p) = NULL;
 
 	dsp = calloc(1, sizeof(*dsp));
 	if (!dsp)

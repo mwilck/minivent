@@ -14,12 +14,11 @@
 #include <sys/time.h>
 #include <sys/timerfd.h>
 #include <syslog.h>
+#include "util.h"
 #include "ts-util.h"
 #include "log.h"
 #include "timeout.h"
 #include "event.h"
-
-#define container_of(X, TYPE, ELEM) ((TYPE *)((void *)(X) - offsetof(TYPE, ELEM)))
 
 struct timeout_handler {
         int source;
@@ -31,7 +30,7 @@ struct timeout_handler {
 
 int timeout_get_clocksource(const struct event *evt)
 {
-	return container_of(evt, struct timeout_handler, ev)->source;
+	return container_of_const(evt, struct timeout_handler, ev)->source;
 }
 
 static void free_timeout_handler(struct timeout_handler *th)
