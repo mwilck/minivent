@@ -122,30 +122,12 @@ int event_add(struct dispatcher *dsp, struct event *event);
  *
  * @event: a previously added event structure
  *
- * NOTE: this function is intended for being called from the callback
- * if it is called with REASON_TIMEOUT. In this case, the timeout is
- * inactive already (because it has expired). In all other situations,
- * call event_finished() instead to deactivate both the event itself
- * and the associated timeout. Calling event_remove() in those other
- * situations would leave an existing timeout active.
+ * Removes the event from the dispatcher, and cancels the associated
+ * timeout (if any).
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  */
 int event_remove(struct event *event);
-
-/**
- * event_finished() - remove an event and timeout
- *
- * @event: a previously added event structure
- *
- * NOTE: this function is intended for being called from the callback
- * if it is called with REASON_EVENT_OCCURED, and if it's not a recurring
- * event. Both the event's fd will be removed from epoll and the event
- * timeout will be canceled.
- *
- * Return: 0 on success, negative error code (-errno) on failure.
- */
-int event_finished(struct event *event);
 
 /**
  * event_modify() - modify epoll events to wait for

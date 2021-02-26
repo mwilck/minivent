@@ -275,7 +275,7 @@ int event_add(struct dispatcher *dsp, struct event *evt)
 
 int event_remove(struct event *evt)
 {
-	int rc;
+	int rc = 0;
 
 	if (!evt || !evt->dsp)
 		return -EINVAL;
@@ -284,20 +284,13 @@ int event_remove(struct event *evt)
 	if (evt->dsp->exiting)
 		return 0;
 
+	timeout_cancel(evt->dsp->timeout_event, evt);
+	if (evt->fd != -1)
+		rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
 	_dispatcher_remove(evt->dsp, evt);
-	rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+	evt->dsp = NULL;
 
 	return rc == -1 ? -errno : 0;
-}
-
-int event_finished(struct event *evt)
-{
-	if (!evt->dsp)
-		return -EINVAL;
-	if (evt->dsp->exiting)
-		return 0;
-	timeout_cancel(evt->dsp->timeout_event, evt);
-	return event_remove(evt);
 }
 
 int event_mod_timeout(struct event *evt, struct timespec *tmo)

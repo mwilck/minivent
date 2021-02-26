@@ -163,10 +163,8 @@ static void evaluate(struct itevent *it,
 	double avg, stdev;
 	unsigned short reason = it->e.reason;
 
-	if (reason == REASON_TIMEOUT)
+	if (reason == REASON_TIMEOUT || reason == REASON_EVENT_OCCURED)
 		event_remove(&it->e);
-	else if (reason == REASON_EVENT_OCCURED)
-		event_finished(&it->e);
 	else {
 		/* test termination */
 		char tb0[24], tb1[24];
@@ -178,7 +176,7 @@ static void evaluate(struct itevent *it,
 			    format_ts(&it->expected, tb0, sizeof(tb0)),
 			    format_ts(stop_ts, tb1, sizeof(tb1)));
 
-		event_finished(&it->e);
+		event_remove(&it->e);
 	}
 	close(it->e.fd);
 
