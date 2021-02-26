@@ -14,3 +14,4 @@ perf.data*
 *.gcno
 *.gcda
 *.gcov
+test/*-mock

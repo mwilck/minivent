@@ -13,6 +13,7 @@ build:cov:
       - test/ts-test
       - test/tv-test
       - test/event-test
+      - test/array-mock
       - ./*.gcno
 
 build:opt:
@@ -25,6 +26,7 @@ build:opt:
       - test/ts-test
       - test/tv-test
       - test/event-test
+      - test/*-mock
 
 coverage:
   stage: test
@@ -35,6 +37,7 @@ coverage:
     - ./test/tv-test
     - ./test/event-test -n 10 -t 10 -q
     - ./test/event-test -n 1 -t 10 -s -q
+    - ./test/array-mock
     - gcovr -r .
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
 
@@ -46,6 +49,7 @@ valgrind:
     - valgrind --leak-check=full ./test/ts-test
     - valgrind --leak-check=full ./test/tv-test
     - valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q
+    - valgrind --leak-check=full ./test/array-mock
 
 tough:
   stage: test

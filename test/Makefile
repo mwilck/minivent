@@ -7,7 +7,7 @@ TS-TEST_OBJS = ts-test.o
 TV-TEST_OBJS = tv-test.o
 OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS)
 
-all:	event-test ts-test tv-test avahi-test
+all:	event-test ts-test tv-test avahi-test array-mock
 
 event-test:     $(EVENT-TEST_OBJS) $(LIB)
 	$(CC) $(LDFLAGS) -o $@ $^ -lm
@@ -37,3 +37,15 @@ clean:
 	$(RM) *.o event-test tu avahi-test ts-test tv-test *~ *.d
 
 include $(wildcard $(OBJS:.o=.d))
+
+%.o.wrap:	%.c
+	@sed -n 's/^.*__wrap_\([a-zA-Z0-9_]*\).*$$/-Wl,--wrap=\1/p' $< | \
+		sort -u | tr '\n' ' ' >$@
+
+# COLON will get expanded during second expansion below
+COLON:=:
+.SECONDEXPANSION:
+%-mock:	%.o %.o.wrap $$($$@_OBJDEPS) $$($$@_TESTDEPS) $$($$@_TESTDEPS$$(COLON).o=.o.wrap) $(LIB) Makefile
+	$(CC) $(CFLAGS) -o $@ $(LDFLAGS) $< $($@_TESTDEPS) $($@_OBJDEPS) \
+		$(LIB) -lcmocka $($@_LIBDEPS) \
+		$(shell cat $<.wrap) $(foreach dep,$($@_TESTDEPS),$(shell cat $(dep).wrap))
