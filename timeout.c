@@ -119,6 +119,15 @@ static long timeout_resize(struct timeout_handler *th, size_t size)
 	return size;
 }
 
+int timeout_reset(struct event  *tmo_event)
+{
+	struct timeout_handler *th =
+		container_of(tmo_event, struct timeout_handler, ev);
+
+	timeout_resize(th, 0);
+	return _timeout_rearm(th, 0);
+}
+
 static int absolute_timespec(int source, struct timespec *ts)
 {
 	struct timespec now;

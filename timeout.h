@@ -73,6 +73,15 @@ int timeout_modify(struct event *tmo_event, struct event *event, struct timespec
 int timeout_cancel(struct event *tmo_event, struct event *);
 
 /**
+ * timeout_reset() - clear all timeouts
+ *
+ * Cancel all timeouts (without calling any callbacks), and disarm the timer.
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+int timeout_reset(struct event *tmo_event);
+
+/**
  * timeout_event() - handle timeout events
  * @tmo_event: struct event returned from new_timeout_event().
  * @events: epoll event bitmask, see epoll_wait(2); expected to be EPOLLIN.

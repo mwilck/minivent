@@ -186,11 +186,11 @@ int cleanup_dispatcher(struct dispatcher *dsp)
 			continue;
 
 		dsp->events[i] = NULL;
-		timeout_cancel(dsp->timeout_event, evt);
 		epoll_ctl(dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
 		if (evt->cleanup)
 			evt->cleanup(evt);
 	}
+	timeout_reset(dsp->timeout_event);
 	free(dsp->events);
 	dsp->events = NULL;
 	dsp->len = dsp->n = dsp->free = 0;
