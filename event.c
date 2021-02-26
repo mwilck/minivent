@@ -31,6 +31,8 @@ const char * const reason_str[__MAX_CALLBACK_REASON] = {
 
 void free_dispatcher(struct dispatcher *dsp)
 {
+	if (!dsp)
+		return;
 	if (dsp->timeout_event)
 		free_timeout_event(dsp->timeout_event);
 	if (dsp->epoll_fd != -1)
@@ -67,11 +69,15 @@ struct dispatcher *new_dispatcher(int clocksrc)
 
 int dispatcher_get_efd(const struct dispatcher *dsp)
 {
+	if (!dsp)
+		return -EINVAL;
 	return dsp->epoll_fd;
 }
 
 int event_add(const struct dispatcher *dsp, struct event *evt)
 {
+	if (!dsp || !evt || !evt->callback)
+		return -EINVAL;
 	evt->ep.data.ptr = evt;
 	evt->dsp = dsp;
 	evt->reason = 0;
@@ -85,7 +91,12 @@ int event_add(const struct dispatcher *dsp, struct event *evt)
 
 int event_remove(struct event *evt)
 {
-	int rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+	int rc;
+
+	if (!evt || !evt->dsp)
+		return -EINVAL;
+
+	rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
 
 	return rc == -1 ? -errno : 0;
 }
@@ -98,14 +109,21 @@ int event_finished(struct event *evt)
 	return event_remove(evt);
 }
 
-int event_mod_timeout(struct event *event, struct timespec *tmo)
+int event_mod_timeout(struct event *evt, struct timespec *tmo)
 {
-	return timeout_modify(event->dsp->timeout_event, event, tmo);
+	if (!evt || !evt->dsp || !tmo)
+		return -EINVAL;
+
+	return timeout_modify(evt->dsp->timeout_event, evt, tmo);
 }
 
 int event_modify(struct event *evt)
 {
-	int rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_MOD,
+	int rc;
+
+	if (!evt || !evt->dsp)
+		return -EINVAL;
+	rc= epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_MOD,
 			   evt->fd, &evt->ep);
 
 	return rc == -1 ? -errno : 0;
@@ -118,6 +136,8 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 	struct epoll_event events[MAX_EVENTS];
 	struct epoll_event *tmo_event = NULL;
 
+	if (!dsp)
+		return -EINVAL;
 	if (ep_fd < 0)
 		return ep_fd;
 
@@ -171,5 +191,7 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 
 int dispatcher_get_clocksource(const struct dispatcher *dsp)
 {
+	if (!dsp)
+		return -EINVAL;
 	return timeout_get_clocksource(dsp->timeout_event);
 }
