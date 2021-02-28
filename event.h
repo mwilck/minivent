@@ -58,11 +58,13 @@ typedef void (*cb_fn)(struct event *evt, uint32_t events);
 /**
  * Prototype for cleanup callback.
  *
+ * Called for this event if the event callback returned EVENTCB_CLEANUP, and
+ * from cleanup_dispatcher() / free_dispatcher(), for all registered events.
+ *
  * If this callback is called, the event has already been
- * removed from the dispatcher's internal lists, no need to call
- * event_finished() any more. Closing the event's fd and possibly
- * deallocating the event is the purpose of the callback. It's fine for
- * the callback to free() the pointer passed to it.
+ * removed from the dispatcher's internal lists. Use this callback
+ * to free the event (if necessary), close file descriptors, and
+ * release other resources as appropriate.
  *
  * @evt: the event object which registered the callback
  */
@@ -124,6 +126,9 @@ int event_add(struct dispatcher *dsp, struct event *event);
  *
  * Removes the event from the dispatcher, and cancels the associated
  * timeout (if any).
+ *
+ * CAUTION: don't call this from callbacks. Use EVENTCB_xxx return codes
+ * instead.
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  */
@@ -202,9 +207,9 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
  *
  * This function calls event_wait() in a loop, and calls err_handler() if
  * event_wait() returns an error code, passing it the negative error code
- * (e.g. -EINTR) in the @err parameter. err_handler() should return 0 (success)
- * or a negative error code to make event_loop() return, and a positve number
- * if event_loop should continue execution.
+ * (e.g. -EINTR) in the @err parameter. err_handler() should return ELOOP_QUIT
+ * or a negative error code to make event_loop() return, and ELOOP_CONTINUE
+ * if event_loop() should continue execution.
  * @err_handler may be NULL, in which case event_loop() will simply return
  * the error code from event_wait().
  *
@@ -218,9 +223,14 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
  * cleanup_dispatcher() - clean out all events and timeouts 
  * @dsp: a pointer returned by new_dispatcher().
  *
- * Remove all events and timeouts, and call every event's callback
- * with the reason  code set to REASON_CLEANUP. The dispatcher object
- * itself remains intact, and can be re-used by adding new events.
+ * Remove all events and timeouts, and call every event's @cleanup
+ * callback. The dispatcher object itself remains intact, and can
+ * be re-used by adding new events.
+ *
+ * NOTE: unlike free_dispatcher(), this function disables the timer
+ * event (as it cancels all timeouts), and removes all fds from the
+ * dispatcher's epoll instance. Thus calling this e.g. after fork()
+ * affects the parent process's operation.
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  */

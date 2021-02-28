@@ -171,13 +171,21 @@ static int _dispatcher_remove(struct dispatcher *dsp, struct event *ev)
 	return _dispatcher_gc(dsp);
 }
 
-int cleanup_dispatcher(struct dispatcher *dsp)
+int _event_remove(struct event *evt)
+{
+	if (evt->fd != -1) {
+		int rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+
+		if (rc == -1)
+			msg(LOG_ERR, "EPOLL_CTL_DEL: %m");
+		return rc;
+	} else
+		return 0;
+}
+
+static void _run_cleanup_handlers(struct dispatcher *dsp, bool do_epoll)
 {
 	unsigned int i;
-
-	if (dsp->exiting)
-		return 0;
-	dsp->exiting = true;
 
 	for (i = 0; i < dsp->n; i++) {
 		struct event *evt = dsp->events[i];
@@ -185,15 +193,29 @@ int cleanup_dispatcher(struct dispatcher *dsp)
 		if (!evt)
 			continue;
 
-		dsp->events[i] = NULL;
-		epoll_ctl(dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+		if (do_epoll)
+			_event_remove(evt);
 		if (evt->cleanup)
 			evt->cleanup(evt);
 	}
+}
+
+int cleanup_dispatcher(struct dispatcher *dsp)
+{
+
+	if (!dsp)
+		return -EINVAL;
+	if (dsp->exiting)
+		return 0;
+
+	dsp->exiting = true;
+
+	_run_cleanup_handlers(dsp, true);
 	timeout_reset(dsp->timeout_event);
+
+	dsp->len = dsp->n = dsp->free = 0;
 	free(dsp->events);
 	dsp->events = NULL;
-	dsp->len = dsp->n = dsp->free = 0;
 	dsp->exiting = false;
 	return 0;
 }
@@ -202,11 +224,18 @@ void free_dispatcher(struct dispatcher *dsp)
 {
 	if (!dsp)
 		return;
-	cleanup_dispatcher(dsp);
+
+	/*
+	 * If this function is called e.g. after fork(), we must not
+	 * call epoll_ctl() or reset the timerfd (thus not call timeout_reset()).
+	 * Just close the dup'd timerfd and epoll_fd, and free memory.
+	 */
+	_run_cleanup_handlers(dsp, false);
 	if (dsp->timeout_event)
 		free_timeout_event(dsp->timeout_event);
 	if (dsp->epoll_fd != -1)
 		close(dsp->epoll_fd);
+	free(dsp->events);
 	free(dsp);
 }
 
@@ -275,22 +304,20 @@ int event_add(struct dispatcher *dsp, struct event *evt)
 
 int event_remove(struct event *evt)
 {
-	int rc = 0;
+	int rc;
 
 	if (!evt || !evt->dsp)
 		return -EINVAL;
-	if (!evt->dsp)
-		return -EINVAL;
-	if (evt->dsp->exiting)
-		return 0;
 
-	timeout_cancel(evt->dsp->timeout_event, evt);
-	if (evt->fd != -1)
-		rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
+	rc = _event_remove(evt);
+	if (rc == -1)
+		rc = -errno;
+
 	_dispatcher_remove(evt->dsp, evt);
+	timeout_cancel(evt->dsp->timeout_event, evt);
 	evt->dsp = NULL;
 
-	return rc == -1 ? -errno : 0;
+	return rc;
 }
 
 int event_mod_timeout(struct event *evt, const struct timespec *tmo)
