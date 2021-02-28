@@ -396,7 +396,7 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 	if (dsp->exiting)
 		return -EBUSY;
 	if (ep_fd < 0)
-		return ep_fd;
+		return -EINVAL;
 
 	rc = epoll_pwait(ep_fd, events, MAX_EVENTS, -1, sigmask);
 	if (rc == -1) {
@@ -428,7 +428,7 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 		ev->reason = 0;
 	}
 
-	return 0;
+	return ELOOP_CONTINUE;
 }
 
 int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
@@ -440,7 +440,7 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 		rc = event_wait(dsp, sigmask);
 		if (rc < 0 && err_handler)
 			rc = err_handler(-errno);
-	} while (rc == 0);
+	} while (rc == ELOOP_CONTINUE);
 
 	return rc;
 }

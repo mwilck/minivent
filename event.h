@@ -221,6 +221,14 @@ void _event_invoke_callback(struct event *, unsigned short, unsigned int, bool);
 int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
 
 /**
+ * Return codes for err_handler in event_loop()
+ */
+enum {
+	ELOOP_CONTINUE = 0,
+	ELOOP_QUIT,
+};
+
+/**
  * event_loop(): wait for some or timeouts, repeatedly
  *
  * @dispatcher: a dispatcher object
@@ -262,8 +270,12 @@ int cleanup_dispatcher(struct dispatcher *dsp);
  * free_dispatcher() - free a dispatcher object.
  * @dsp: a pointer returned by new_dispatcher().
  *
- * This function calls cleanup_dispatcher() before freeing the data
- * structures of the dispatcher.
+ * Calls the @cleanup callback of every registered event, and frees
+ * the dispatcher's data structures.
+ *
+ * NOTE: Unlike cleanup_dispatcher(), this function doesn't touch the
+ * kernel-owned epoll and itimerfd data structures. It's safe to call after
+ * fork() without disturbing the parent.
  */
 void free_dispatcher(struct dispatcher *dsp);
 
