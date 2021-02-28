@@ -6,6 +6,9 @@
 #define _EVENT_H
 #include <sys/epoll.h>
 
+struct event;
+struct dispatcher;
+
 /**
  * reason codes for event callback function
  * @REASON_EVENT_OCCURED: the event has occured
@@ -23,8 +26,17 @@ enum {
  */
 extern const char * const reason_str[__MAX_CALLBACK_REASON];
 
-struct event;
-struct dispatcher;
+/**
+ * Return codes for callback function
+ * @EVENTCB_CONTINUE:  continue processing
+ * @EVENTCB_REMOVE:    remove this event
+ * @EVENTCB_CLEANUP:   call the cleanup callback (implies EVENTCB_REMOVE)
+ */
+enum {
+	EVENTCB_CONTINUE = 0,
+	EVENTCB_REMOVE =   1,
+	EVENTCB_CLEANUP =  2,
+};
 
 /*
  * Flags for struct event
@@ -52,8 +64,11 @@ enum {
  * and in this case, handle the event as if it had arrived before
  * the timeout.
  *
+ * CAUTION: don not free() @evt in this callback.
+ *
+ * Return: an EVENTCB_xxx value (see above).
  */
-typedef void (*cb_fn)(struct event *evt, uint32_t events);
+typedef int (*cb_fn)(struct event *evt, uint32_t events);
 
 /**
  * Prototype for cleanup callback.
@@ -175,6 +190,14 @@ int event_modify(struct event *event);
 int event_mod_timeout(struct event *event, const struct timespec *tmo);
 
 /**
+ * int _event_invoke_callback - handle callback invocation
+ * @reason: one of the reason codes above
+ *
+ * Internal use only.
+ */
+void _event_invoke_callback(struct event *, unsigned short, unsigned int, bool);
+
+/**
  * event_wait(): wait for events or timeouts, once
  *
  * @dispatcher: a dispatcher object
@@ -192,9 +215,8 @@ int event_mod_timeout(struct event *event, const struct timespec *tmo);
  * NOTE: if no events have been added to the dispatcher before calling this
  * function, it will block waiting until a signal is caught.
  *
- * Return: a positive number (number of events seen) on success, a
- * negative error code (-errno) on failure.
- * In particular, it returns -EINTR if interrupted by a caught signal.
+ * Return: 0 on success, a negative error code (-errno) on failure,
+ * which might be -EINTR.
  */
 int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
 
@@ -213,14 +235,14 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
  * @err_handler may be NULL, in which case event_loop() will simply return
  * the error code from event_wait().
  *
- * Return: 0 on success, negative error code (-errno) on failure.
+ * Return: 0 on success, or negative error code (-errno) on failure.
  * In particular, it returns -EINTR if interrupted by caught signal.
  */
 int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 	       int (*err_handler)(int err));
 
 /**
- * cleanup_dispatcher() - clean out all events and timeouts 
+ * cleanup_dispatcher() - clean out all events and timeouts
  * @dsp: a pointer returned by new_dispatcher().
  *
  * Remove all events and timeouts, and call every event's @cleanup

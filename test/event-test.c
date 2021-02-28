@@ -196,7 +196,7 @@ static void evaluate(struct itevent *it,
 	*total_sq += it->sq_deviation;
 }
 
-static void test_cb(struct event *evt, uint32_t __attribute__((unused)) events)
+static int test_cb(struct event *evt, uint32_t __attribute__((unused)) events)
 {
 
 	uint64_t val;
@@ -336,6 +336,8 @@ check_timer:
 		msg(LOG_ERR, "failed to set new timeout: %s\n", strerror(-rc));
 		itev->err_count++;
 	}
+
+	return EVENTCB_CONTINUE;
 }
 
 static void free_dsp(struct dispatcher **dsp) {
@@ -348,10 +350,11 @@ static const struct event evt0 = {
 	.callback = test_cb,
 };
 
-static void fini_cb(struct event *evt, uint32_t __attribute__((unused)) events)
+static int fini_cb(struct event *evt, uint32_t __attribute__((unused)) events)
 {
 	msg(LOG_INFO, "%s\n", reason_str[evt->reason]);
 	exit_main_loop();
+	return EVENTCB_CONTINUE;
 }
 
 static const struct event evt_fini = {

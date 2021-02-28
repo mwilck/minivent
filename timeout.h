@@ -93,8 +93,10 @@ int timeout_reset(struct event *tmo_event);
  *
  * If the callback wants to extend or otherwise re-arm the timeout, it must call
  * timeout_add() or (preferrably) timeout_modify().
+ *
+ * Return: EVENTCB_CONTINUE
  */
-void timeout_event(struct event *tmo_event, uint32_t events);
+int timeout_event(struct event *tmo_event, uint32_t events);
 
 /**
  * timeout_get_clocksource() - obtain clock source used

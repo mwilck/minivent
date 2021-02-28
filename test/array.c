@@ -49,9 +49,10 @@ static void free_cb(struct event *evt)
 	free(evt);
 }
 
-static void callback(struct event *evt __U__, unsigned int event __U__)
+static int callback(struct event *evt __U__, unsigned int event __U__)
 {
 	assert_true(false);
+	return EVENTCB_CONTINUE;
 }
 
 static void setup_events(void)

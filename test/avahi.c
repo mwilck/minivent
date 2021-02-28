@@ -52,7 +52,7 @@ struct AvahiMiniPoll {
 	AVAHI_LLIST_HEAD(AvahiTimeout, timeouts);
 };
 
-static void watch_cb(struct event *evt, uint32_t what)
+static int watch_cb(struct event *evt, uint32_t what)
 {
 	AvahiWatch *w = container_of(evt, AvahiWatch, ev);
 	AvahiWatchEvent events = 0;
@@ -64,6 +64,7 @@ static void watch_cb(struct event *evt, uint32_t what)
 		events |= AVAHI_WATCH_OUT;
 
 	w->cb(w, evt->fd, events, w->userdata);
+	return EVENTCB_CONTINUE;
 }
 
 static int
@@ -159,7 +160,7 @@ watch_free(AvahiWatch *w)
 	free(w);
 }
 
-static void
+static int
 timeout_cb(struct event *evt, AVAHI_GCC_UNUSED uint32_t what)
 {
 	AvahiTimeout *t = container_of(evt, AvahiTimeout, ev);
@@ -167,6 +168,7 @@ timeout_cb(struct event *evt, AVAHI_GCC_UNUSED uint32_t what)
 	assert(evt->reason == REASON_TIMEOUT);
 	msg(LOG_DEBUG, "called\n");
 	t->cb(t, t->userdata);
+	return EVENTCB_CONTINUE;
 }
 
 static int

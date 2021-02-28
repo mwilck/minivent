@@ -172,7 +172,7 @@ static int timeout_add_ev(struct timeout_handler *th, struct event *event)
                 return errno ? -errno : -EIO;
         }
 
-        msg(LOG_INFO, "new timeout at pos %ld/%ld: %ld.%06ld\n",
+        msg(LOG_DEBUG, "new timeout at pos %ld/%ld: %ld.%06ld\n",
             pos, th->len, event->tmo.tv_sec, event->tmo.tv_nsec / 1000L);
 
         if (pos == 0)
@@ -197,7 +197,7 @@ static int timeout_cancel_ev(struct timeout_handler *th, struct event *evt)
         for (pos = 0; pos < (long)th->len && ts != th->timeouts[pos]; pos++);
 
         if (pos == (long)th->len) {
-                msg(LOG_INFO, "%p: not found\n", evt);
+                msg(LOG_DEBUG, "%p: not found\n", evt);
 		/*
 		 * This is normal if called from a timeout handler.
 		 * Mark the event as having no timeout.
@@ -206,7 +206,7 @@ static int timeout_cancel_ev(struct timeout_handler *th, struct event *evt)
                 return -ENOENT;
         }
 
-	msg(LOG_INFO, "timeout %ld cancelled, %ld.%06ld\n",
+	msg(LOG_DEBUG, "timeout %ld cancelled, %ld.%06ld\n",
             pos, ts->tv_sec, ts->tv_nsec / 1000L);
 
 	*ts = null_ts;
@@ -284,7 +284,7 @@ int timeout_modify(struct event *tmo_event, struct event *evt, struct timespec *
 			(pos - pnew)  * sizeof(*th->timeouts));
 		th->timeouts[pnew] = &evt->tmo;
 	}
-	msg(LOG_INFO, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
+	msg(LOG_DEBUG, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
             pos, pnew, ts->tv_sec, ts->tv_nsec / 1000L,
             new->tv_sec, new->tv_nsec / 1000L);
 	evt->tmo = *new;
@@ -303,34 +303,27 @@ static void _timeout_run_callbacks(struct timespec **tss, long n)
                 struct event *evt;
 
                 evt = container_of(tss[i], struct event, tmo);
-		if (evt->reason != 0) {
-			msg(LOG_INFO, "skipping event: %s\n",
-			    reason_str[evt->reason]);
-			continue;
-		}
 
                 msg(LOG_DEBUG, "calling callback %ld (%ld.%06ld)\n", i,
                     tss[i]->tv_sec, tss[i]->tv_nsec / 1000);
 
-		evt->reason =  REASON_TIMEOUT;
-		evt->callback(evt, 0);
-		evt->reason = 0;
+		_event_invoke_callback(evt, REASON_TIMEOUT, 0, true);
         }
+
 }
 
-void timeout_event(struct event *tmo_ev, uint32_t events)
+int timeout_event(struct event *tmo_ev, uint32_t events)
 {
 	struct timeout_handler *th = container_of(tmo_ev, struct timeout_handler, ev);
         struct timespec now;
         struct timespec **expired;
-        int rc;
         long pos = th->len;
 	uint64_t val;
 
 	if (tmo_ev->reason != REASON_EVENT_OCCURED || events & ~EPOLLIN) {
 		msg(LOG_WARNING, "unexpected reason %s, events 0x%08x\n",
 		    reason_str[tmo_ev->reason], events);
-		return;
+		return EVENTCB_CONTINUE;
 	}
 
 	if (read(tmo_ev->fd, &val, sizeof(val)) == -1)
@@ -341,8 +334,7 @@ void timeout_event(struct event *tmo_ev, uint32_t events)
 		msg(errno == EAGAIN ? LOG_DEBUG : LOG_ERR,
 		    "failed to read timerfd: %m\n");
 
-	if ((rc = clock_gettime(th->source, &now)) == -1)
-		return;
+	clock_gettime(th->source, &now);
 
         /*
          * callbacks may add new timers, therefore we must iterate here.
@@ -376,4 +368,5 @@ void timeout_event(struct event *tmo_ev, uint32_t events)
         }
 
         _timeout_rearm(th, 0);
+	return EVENTCB_CONTINUE;
 }

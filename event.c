@@ -356,6 +356,34 @@ int event_modify(struct event *evt)
 	return rc == -1 ? -errno : 0;
 }
 
+void _event_invoke_callback(struct event *ev, unsigned short reason,
+			   unsigned int events, bool reset_reason)
+{
+	int rc;
+
+	if (ev->reason) {
+		msg(LOG_INFO, "skipping callback for %s because of %s\n",
+		    reason_str[reason], reason_str[ev->reason]);
+		return;
+	}
+
+	ev->reason = reason;
+	rc = ev->callback(ev, events);
+
+	if (rc == EVENTCB_CLEANUP) {
+		msg(LOG_DEBUG, "cleaning out event\n");
+		event_remove(ev);
+		if (ev->cleanup)
+			ev->cleanup(ev);
+	} else if (rc == EVENTCB_REMOVE) {
+		msg(LOG_DEBUG, "removing event\n");
+		event_remove(ev);
+		ev->reason = 0;
+	} else if (reset_reason)
+		ev->reason = 0;
+}
+
+
 int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 {
 	int ep_fd = dispatcher_get_efd(dsp);
@@ -377,23 +405,22 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 		return -errno;
 	}
 
-	msg(LOG_INFO, "received %d events\n", rc);
+	msg(LOG_DEBUG, "received %d events\n", rc);
 	for (i = 0; i < rc; i++) {
 		struct event *ev = events[i].data.ptr;
 
 		if (ev == dsp->timeout_event)
 			tmo_event = &events[i];
-		else {
-			ev->reason = REASON_EVENT_OCCURED;
-			ev->callback(ev, events[i].events);
-		}
+		else
+			_event_invoke_callback(ev, REASON_EVENT_OCCURED,
+					       events[i].events, false);
 	}
 
 	if (tmo_event) {
 		struct event *ev = tmo_event->data.ptr;
 
-		ev->reason = REASON_EVENT_OCCURED;
-		ev->callback(ev, tmo_event->events);
+		_event_invoke_callback(ev, REASON_EVENT_OCCURED,
+					    tmo_event->events, false);
 	}
 
 	for (i = 0; i < rc; i++) {
@@ -401,7 +428,7 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 		ev->reason = 0;
 	}
 
-	return rc;
+	return 0;
 }
 
 int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
@@ -413,9 +440,9 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 		rc = event_wait(dsp, sigmask);
 		if (rc < 0 && err_handler)
 			rc = err_handler(-errno);
-	} while (rc > 0);
+	} while (rc == 0);
 
-	return rc >= 0 ? 0 : rc;
+	return rc;
 }
 
 int dispatcher_get_clocksource(const struct dispatcher *dsp)
