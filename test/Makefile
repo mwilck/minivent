@@ -1,13 +1,15 @@
 CFLAGS += -I.. $(COMMON_CFLAGS)
 
 LIB := ../libev.a
-EVENT-TEST_OBJS = event-test.o
-AVAHI-TEST_OBJS = avahi.o avahi-test.o
-TS-TEST_OBJS = ts-test.o
-TV-TEST_OBJS = tv-test.o
-OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS)
+EVENT-TEST_OBJS := event-test.o
+AVAHI-TEST_OBJS := avahi.o avahi-test.o
+TS-TEST_OBJS := ts-test.o
+TV-TEST_OBJS := tv-test.o
+ECHO-TEST-OBJS := echo-test.o 
+OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS) \
+	$(ECHO-TEST-OBJS)
 
-all:	event-test ts-test tv-test avahi-test array-mock
+all:	event-test ts-test tv-test avahi-test echo-test array-mock
 
 event-test:     $(EVENT-TEST_OBJS) $(LIB)
 	$(CC) $(LDFLAGS) -o $@ $^ -lm
@@ -23,6 +25,9 @@ avahi.o avahi-test.o:	CFLAGS += $(shell pkg-config --cflags avahi-core) -MMD -MP
 avahi-test:	$(AVAHI-TEST_OBJS) $(LIB)
 	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs avahi-core)
 
+echo-test:	$(ECHO-TEST-OBJS) $(LIB)
+	$(CC) $(LDFLAGS) -o $@ $^
+
 ts-test.c:	time-test-inc.c time-test.c
 	cat time-test-inc.c >$@
 	echo '#include "ts-util.h"' >>$@
@@ -34,7 +39,7 @@ tv-test.c:	time-test-inc.c time-test.c
 	$(CPP) -P -DGEN_TV=1 time-test.c | indent -linux >>$@
 
 clean:
-	$(RM) *.o event-test tu avahi-test ts-test tv-test *~ *.d
+	$(RM) *.o *~ *.d *-mock *-test
 
 include $(wildcard $(OBJS:.o=.d))
 

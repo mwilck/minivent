@@ -4,10 +4,16 @@
  */
 
 static sig_atomic_t must_exit;
+static sig_atomic_t got_sigchld;
 
 static void int_handler(int sig __attribute__((unused)))
 {
 	must_exit = 1;
+}
+
+static void chld_handler(int sig __attribute__((unused)))
+{
+	got_sigchld = 1;
 }
 
 static sigset_t orig_sigmask;
@@ -30,9 +36,20 @@ static int init_signals(void)
 		return -errno;
 	if (sigaction(SIGALRM, &sa, NULL) == -1)
 		return -errno;
+	sa.sa_handler = chld_handler;
+	if (sigaction(SIGCHLD, &sa, NULL) == -1)
+		return -errno;
 	return 0;
 }
 
+static __attribute__((unused))
+void set_wait_mask(sigset_t *mask)
+{
+	sigfillset(mask);
+	sigdelset(mask, SIGTERM);
+	sigdelset(mask, SIGINT);
+	sigdelset(mask, SIGCHLD);
+}
 
 static __attribute__((unused))
 void exit_main_loop(void)

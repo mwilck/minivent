@@ -10,10 +10,8 @@ build:cov:
   artifacts:
     paths:
       - libev.a
-      - test/ts-test
-      - test/tv-test
-      - test/event-test
-      - test/array-mock
+      - test/*-test
+      - test/*-mock
       - ./*.gcno
 
 build:opt:
@@ -23,9 +21,7 @@ build:opt:
   artifacts:
     paths:
       - libev.a
-      - test/ts-test
-      - test/tv-test
-      - test/event-test
+      - test/*-test
       - test/*-mock
 
 coverage:
@@ -35,9 +31,10 @@ coverage:
   script:
     - ./test/ts-test
     - ./test/tv-test
+    - ./test/array-mock
     - ./test/event-test -n 10 -t 10 -q
     - ./test/event-test -n 1 -t 10 -s -q
-    - ./test/array-mock
+    - ./test/echo-test -n 2 -t 10
     - gcovr -r .
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
 
@@ -48,8 +45,9 @@ valgrind:
   script:
     - valgrind --leak-check=full ./test/ts-test
     - valgrind --leak-check=full ./test/tv-test
-    - valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q
     - valgrind --leak-check=full ./test/array-mock
+    - valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q
+    - valgrind --leak-check=full ./test/echo-test -n 2 -t 10
 
 tough:
   stage: test
@@ -59,6 +57,7 @@ tough:
     FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
   script:
     ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
+    ./test/echo-test -n 100 -t 60
   retry: 1
 
 

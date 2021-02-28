@@ -445,9 +445,7 @@ static int do_test(const char *name,
 			msg(LOG_ERR, "failed to add event %d: %m\n", i);
 	}
 
-	sigfillset(&ep_mask);
-	sigdelset(&ep_mask, SIGTERM);
-	sigdelset(&ep_mask, SIGINT);
+	set_wait_mask(&ep_mask);
 
 	if (!stop_signal) {
 		ev_stop.tmo.tv_sec = runtime;
