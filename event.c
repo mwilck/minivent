@@ -293,9 +293,10 @@ int event_remove(struct event *evt)
 	return rc == -1 ? -errno : 0;
 }
 
-int event_mod_timeout(struct event *evt, struct timespec *tmo)
+int event_mod_timeout(struct event *evt, const struct timespec *tmo)
 {
 	unsigned int i;
+	struct timespec ts;
 
 	if (!evt || !evt->dsp || !tmo)
 		return -EINVAL;
@@ -306,7 +307,8 @@ int event_mod_timeout(struct event *evt, struct timespec *tmo)
 		return -EEXIST;
 	}
 
-	return timeout_modify(evt->dsp->timeout_event, evt, tmo);
+	ts = *tmo;
+	return timeout_modify(evt->dsp->timeout_event, evt, &ts);
 }
 
 int event_modify(struct event *evt)

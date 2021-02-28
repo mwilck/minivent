@@ -167,7 +167,7 @@ int event_modify(struct event *event);
  *
  * Return: 0 on success, negative error code (-errno) on failure.
  */
-int event_mod_timeout(struct event *event, struct timespec *tmo);
+int event_mod_timeout(struct event *event, const struct timespec *tmo);
 
 /**
  * event_wait(): wait for events or timeouts, once
