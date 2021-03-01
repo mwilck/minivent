@@ -5,14 +5,10 @@
 *.d
 cscope.files
 cscope.out
-event-test
-avahi-test
-echo-test
-ts-test
-tv-test
 libev.a
 perf.data*
 *.gcno
 *.gcda
 *.gcov
 test/*-mock
+test/*-test
