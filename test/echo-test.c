@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -38,6 +39,16 @@ static const struct sockaddr_un minivent_sa = {
 struct cfg {
 	int n_clients;
 	int accept_s;
+	int wait;
+} echo_cfg = {
+	.n_clients = 1,
+	.accept_s = 30,
+	/*
+	 * Default: 2100 ms - together with RECV_TMO_SECS, this
+	 * causes a ~5% probability for a timeout on server side.
+	 */
+	.wait = 2100,
+
 };
 
 /* struct event at offset 0 to be able to use convenience macros */
@@ -56,7 +67,7 @@ struct clt_event {
 
 #define SEND_TMO_SECS 1
 #define RECV_TMO_SECS 2
-#define CLT_DELAY_SECS 2
+#define CLT_DELAY_SECS 0
 
 static struct timespec accept_tmo = { .tv_sec = 30, };
 static const struct timespec recv_tmo = { .tv_sec = RECV_TMO_SECS, };
@@ -179,15 +190,19 @@ static int clt_cb(struct event *evt, uint32_t events)
 				clt->max_duration = now;
 		}
 
-		evt->ep.events = 0;
+		if (echo_cfg.wait == 0) {
+			evt->ep.events = EPOLLOUT|EPOLLHUP;
+			tmo = send_tmo;
+		} else {
+			evt->ep.events = 0;
 
-		/* small chance for server side timeout */
-		tmo.tv_sec = 1;
-		tmo.tv_nsec = (random() % 110) * 10000000;
-		ts_normalize(&tmo);
+			tmo.tv_sec = 0;
+			tmo.tv_nsec = ((random() % echo_cfg.wait) + 1) * 1000000;
+			ts_normalize(&tmo);
 
-		msg(LOG_DEBUG, "response: \"%s\", next in %ld.%06lds\n",
-		    buf, tmo.tv_sec, tmo.tv_nsec / 1000);
+			msg(LOG_DEBUG, "response: \"%s\", next in %ld.%06lds\n",
+			    buf, tmo.tv_sec, tmo.tv_nsec / 1000);
+		}
 	}
 
 	if ((rc = event_modify(evt)) < 0) {
@@ -233,6 +248,7 @@ static int client(int num)
 
 	/* Start with timer. Events will be set on first callback invocation */
 	clt.e = EVENT_W_TMO_ON_STACK(clt_cb, sfd, 0, CLT_DELAY_SECS);
+	clt.e.tmo.tv_nsec = 100;
 	clt.e.cleanup = clt_cleanup;
 	clt.pid = getpid();
 
@@ -276,11 +292,11 @@ static int start_clt_cb(struct event *ev, uint32_t events __attribute__((unused)
 	return EVENTCB_CONTINUE;
 }
 
-static int start_clients(struct dispatcher *dsp, const struct cfg *cfg)
+static int start_clients(struct dispatcher *dsp)
 {
 	int i;
 
-	for (i = 0; i < cfg->n_clients; i++) {
+	for (i = 0; i < echo_cfg.n_clients; i++) {
 		struct event *ev __cleanup__(free_ev) = calloc(1, sizeof(*ev));
 		int rc;
 
@@ -298,6 +314,8 @@ static int start_clients(struct dispatcher *dsp, const struct cfg *cfg)
 	return 0;
 }
 
+static bool must_close;
+
 static int conn_cb(struct event *ev, uint32_t events)
 {
 	struct echo_event *echo = container_of(ev, struct echo_event, e);
@@ -306,6 +324,9 @@ static int conn_cb(struct event *ev, uint32_t events)
 
 	if (ev->reason == REASON_TIMEOUT) {
 		msg(LOG_WARNING, "timeout\n");
+		return EVENTCB_CLEANUP;
+	} else if (must_close) {
+		msg(LOG_WARNING, "closing socket\n");
 		return EVENTCB_CLEANUP;
 	} else if (events & EPOLLHUP) {
 		msg(LOG_WARNING, "peer hung up\n");
@@ -356,8 +377,9 @@ static int accept_cb(struct event *ev, uint32_t events __attribute__((unused)))
 	int rc;
 
 	if (ev->reason == REASON_TIMEOUT) {
-		msg(LOG_NOTICE, "timeout in accept, killing server\n");
-		return kill_server();
+		msg(LOG_NOTICE, "timeout in accept, server\n");
+		must_close = true;
+		return EVENTCB_CLEANUP;
 	}
 
 	if ((cfd = accept(ev->fd, NULL, NULL)) == -1) {
@@ -385,6 +407,8 @@ static int accept_cb(struct event *ev, uint32_t events __attribute__((unused)))
 
 	return EVENTCB_CONTINUE;
 }
+
+int n_terminated;
 
 static int handle_intr(int errcode)
 {
@@ -414,6 +438,7 @@ static int handle_intr(int errcode)
 			/* fallthrough */
 			break;
 		default:
+			n_terminated++;
 			if (!WIFEXITED(wstatus))
 				msg(LOG_WARNING, "child %ld didn't exit normally\n",
 				    (long)pid);
@@ -427,10 +452,14 @@ static int handle_intr(int errcode)
 		}
 	} while (pid > 0);
 
-	return ELOOP_CONTINUE;
+	msg(LOG_DEBUG, "%d clients stopped\n", n_terminated);
+	if (n_terminated >= echo_cfg.n_clients)
+		return ELOOP_QUIT;
+	else
+		return ELOOP_CONTINUE;
 }
 
-static int server(const struct cfg *cfg)
+static int server(void)
 {
 	struct dispatcher *dsp __cleanup__(free_dsp) =
 		new_dispatcher(CLOCK_REALTIME);
@@ -444,7 +473,7 @@ static int server(const struct cfg *cfg)
 		return errno ? -errno : -1;
 	}
 
-	if ((rc = start_clients(dsp, cfg)) < 0)
+	if ((rc = start_clients(dsp)) < 0)
 		return -1;
 
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -462,13 +491,13 @@ static int server(const struct cfg *cfg)
 		return -errno;
 	}
 
-	if (listen(fd, cfg->n_clients) == -1) {
+	if (listen(fd, echo_cfg.n_clients) == -1) {
 		msg(LOG_ERR, "listen() failed: %m\n");
 		return -errno;
 	}
 
 	srv_event = EVENT_W_TMO_ON_STACK(accept_cb, fd, EPOLLIN,
-					 cfg->accept_s);
+					 echo_cfg.accept_s);
 	if ((rc = event_add(dsp, &srv_event) < 0))
 		return rc;
 
@@ -502,6 +531,7 @@ static void usage(const char *prog)
 	    "Options:\n"
 	    "\t[--num-clients|-n] $NUM		set number of clients\n"
 	    "\t[--runtime|-t] $SECONDS		set run time\n"
+	    "\t[--max-wait|-w] $MILLISECONDS	max time for clients to wait between requests\n"
 	    "\t|-q|--quiet]			suppress log messages\n"
 	    "\t[-v|--verbose]			verbose messages\n"
 	    "\t[-d|--debug]			debug messages\n"
@@ -509,12 +539,13 @@ static void usage(const char *prog)
 	    prog);
 }
 
-static int parse_opts(int argc, char * const argv[], struct cfg *cfg)
+static int parse_opts(int argc, char * const argv[])
 {
-	static const char opts[] = "n:t:qvdh";
+	static const char opts[] = "n:t:w:qvdh";
 	static const struct option longopts[] = {
 		{ "num-clients", true, NULL, 'n', },
 		{ "runtime", true, NULL, 't', },
+		{ "max-wait", true, NULL, 'w', },
 		{ "quiet", false, NULL, 'q'},
 		{ "verbose", false, NULL, 'v'},
 		{ "debug", false, NULL, 'd'},
@@ -525,10 +556,13 @@ static int parse_opts(int argc, char * const argv[], struct cfg *cfg)
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
 		switch (opt) {
 		case 'n':
-			read_int(optarg, "--num-clients", &cfg->n_clients);
+			read_int(optarg, "--num-clients", &echo_cfg.n_clients);
 			break;
 		case 't':
-			read_int(optarg, "--runtime", &cfg->accept_s);
+			read_int(optarg, "--runtime", &echo_cfg.accept_s);
+			break;
+		case 'w':
+			read_int(optarg, "--max-wait", &echo_cfg.wait);
 			break;
 		case 'q':
 			if (log_level < LOG_INFO)
@@ -554,29 +588,29 @@ static int parse_opts(int argc, char * const argv[], struct cfg *cfg)
 		usage(argv[0]);
 		return -EINVAL;
 	}
-	if (cfg->n_clients < 0) {
+	if (echo_cfg.n_clients <= 0) {
 		msg(LOG_ERR, "number of clients must be positive\n");
 		return -EINVAL;
 	}
-	if (cfg->accept_s <= 0) {
+	if (echo_cfg.wait < 0) {
+		msg(LOG_ERR, "wait time must be non-negative\n");
+		return -EINVAL;
+	}
+	if (echo_cfg.accept_s <= 0) {
 		msg(LOG_ERR, "runtime must be positive\n");
 		return -EINVAL;
 	} else
-		accept_tmo.tv_sec = cfg->accept_s;
+		accept_tmo.tv_sec = echo_cfg.accept_s;
 
 	return 0;
 }
 
 int main(int argc, char * const argv[])
 {
-	struct cfg cfg = {
-		.n_clients = 1,
-		.accept_s = 30,
-	};
-
+	struct timespec start, stop;
 	log_timestamp = true;
 	log_pid = true;
-	if (parse_opts(argc, argv, &cfg) < 0)
+	if (parse_opts(argc, argv) < 0)
 		return 1;
 
 	if (init_signals() != 0) {
@@ -584,8 +618,14 @@ int main(int argc, char * const argv[])
                 return 1;
         }
 
-	if (server(&cfg) < 0)
+	clock_gettime(CLOCK_REALTIME, &start);
+	if (server() < 0)
 		return 1;
+	clock_gettime(CLOCK_REALTIME, &stop);
+	ts_subtract(&stop, &start);
+
+	msg(LOG_NOTICE, "#clients: %d, runtime: %ld.%06ld\n",
+	    echo_cfg.n_clients, stop.tv_sec, stop.tv_nsec/1000);
 
 	return 0;
 }

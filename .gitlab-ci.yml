@@ -62,6 +62,9 @@ tough:
     - export LD_LIBRARY_PATH=$PWD
     - ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
     - ./test/echo-test -n 100 -t 60
+    - ./test/echo-test -n 1 -t 10 -w 0
+    - ./test/echo-test -n 2 -t 10 -w 0
+    - ./test/echo-test -n 4 -t 10 -w 0
   retry: 1
 
 
