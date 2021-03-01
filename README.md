@@ -148,6 +148,39 @@ The sample program [mini-test.c](test/mini-test.c) has the full working code.
 functionality of **minivent** extensively to demonstrate various aspects
 of the API.
 
+## Performance
+
+**minivent** isn't fine-tuned for maximum throughput or IOPS, it was mainly developed
+with "rare" events in mind, which are likely to time out. It is
+single-threaded by design. This said, the `echo-test` program can be used as a
+simple benchmark with the option `--max-wait=0`, it sends small messages back
+and forth via sockets, between a configurable number of clients and an
+event-driven server process:
+
+    export LD_LIBRARY_PATH=$PWD
+    ./test/echo-test --runtime=100 --max-wait=0 --num-clients=$N
+
+Here are a few results from a 2-socket, 6-core Intel® E5-2620 v3 system:
+
+| # clients | requests / s | max rtt / us |
+|----------:|-------------:|-------------:|
+| 1         |       140000 |           80 |
+| 2         |       280000 |          137 |
+| 4         |       270000 |          141 |
+| 8         |       240000 |          265 |
+| 16        |       260000 |          320 |
+| 100       |       250000 |        10000 |
+
+Here, a "request" means one message sent back and forth between client and
+server, and the "rtt" measures the round trip time between the client sending
+the message and retrieving the same message back. "max rtt" means the maximum
+measured rtt over all request and all clients. It can be seen that the
+single-threaded server is saturated with two clients.
+
+[Perf](https://perf.wiki.kernel.org/index.php/Main_Page) data indicates that
+in these simple benchmarks, most time is spent in the kernel, **write(2)** and
+**read(2)** accounting for more than half of the CPU load.
+
 ## Missing features and caveats
 
 This code is provided **WITHOUT ANY WARRANTY**. See the [license](LICENSE.txt) for details.
