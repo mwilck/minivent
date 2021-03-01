@@ -9,7 +9,7 @@ build:cov:
     - make COV=1 test
   artifacts:
     paths:
-      - libev.a
+      - libminivent.so
       - test/*-test
       - test/*-mock
       - ./*.gcno
@@ -20,7 +20,7 @@ build:opt:
     - make test
   artifacts:
     paths:
-      - libev.a
+      - libminivent.so
       - test/*-test
       - test/*-mock
 
@@ -29,8 +29,10 @@ coverage:
   dependencies:
     - build:cov
   script:
+    - export LD_LIBRARY_PATH=$PWD
     - ./test/ts-test
     - ./test/tv-test
+    - ./test/mini-test
     - ./test/array-mock
     - ./test/event-test -n 10 -t 10 -q
     - ./test/event-test -n 1 -t 10 -s -q
@@ -43,6 +45,7 @@ valgrind:
   dependencies:
     - build:opt
   script:
+    - export LD_LIBRARY_PATH=$PWD
     - valgrind --leak-check=full ./test/ts-test
     - valgrind --leak-check=full ./test/tv-test
     - valgrind --leak-check=full ./test/array-mock
@@ -56,8 +59,9 @@ tough:
   variables:
     FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
   script:
-    ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
-    ./test/echo-test -n 100 -t 60
+    - export LD_LIBRARY_PATH=$PWD
+    - ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
+    - ./test/echo-test -n 100 -t 60
   retry: 1
 
 
