@@ -345,22 +345,12 @@ static void free_dsp(struct dispatcher **dsp) {
 		free_dispatcher(*dsp);
 }
 
-static const struct event evt0 = {
-	.ep.events = EPOLLIN,
-	.callback = test_cb,
-};
-
 static int fini_cb(struct event *evt, uint32_t __attribute__((unused)) events)
 {
 	msg(LOG_INFO, "%s\n", reason_str[evt->reason]);
 	exit_main_loop();
 	return EVENTCB_CONTINUE;
 }
-
-static const struct event evt_fini = {
-	.fd = -1,
-	.callback = fini_cb,
-};
 
 static void cleanup_itevent(struct itevent **it)
 {
@@ -379,7 +369,7 @@ static int do_test(const char *name,
 {
 	struct itevent *itev __attribute__((cleanup(cleanup_itevent))) = NULL;
 	struct event **evt __attribute__((cleanup(cleanup_event))) = NULL;;
-	struct event ev_stop = evt_fini;
+	struct event ev_stop;
 
 	sigset_t ep_mask;
 	int i, rc;
@@ -404,16 +394,15 @@ static int do_test(const char *name,
 
 	for (i = 0; i < n_events; i++) {
 		struct itimerspec it = {0, };
+		int ifd;
 
 		memset(&itev[i], 0, sizeof(itev[i]));
-		itev[i].e = evt0;
-		itev[i].e.ep.data.ptr = &itev[i].e;
-		itev[i].e.fd = timerfd_create(LOG_CLOCK,
-					      TFD_NONBLOCK|TFD_CLOEXEC);
-		if (itev[i].e.fd == -1) {
+		ifd = timerfd_create(LOG_CLOCK, TFD_NONBLOCK|TFD_CLOEXEC);
+		if (ifd == -1) {
 			msg(LOG_ERR, "timerfd_create: %m\n");
 			return 1;
 		}
+		itev[i].e = EVENT_ON_STACK(test_cb, ifd,  EPOLLIN);
 		start_times(i, &it, &itev[i].e.flags);
 		if (!(itev[i].e.flags & TMO_ABS)) {
 			clock_gettime(LOG_CLOCK, &itev[i].expected);
@@ -448,7 +437,7 @@ static int do_test(const char *name,
 	set_wait_mask(&ep_mask);
 
 	if (!stop_signal) {
-		ev_stop.tmo.tv_sec = runtime;
+		ev_stop = TIMER_EVENT_ON_STACK(fini_cb, runtime);
 		if (event_add(dsp, &ev_stop))
 			msg(LOG_ERR, "failed to add stop event: %m\n");
 	} else {
@@ -588,7 +577,7 @@ static int check_args(int argc, char *const argv[])
 
 int main(int argc, char *const argv[])
 {
-	log_level = LOG_NOTICE;
+	log_level = LOG_WARNING;
 	log_timestamp = true;
 	struct sched_param sp;
 	int rc = 0;

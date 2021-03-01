@@ -40,6 +40,7 @@ struct cfg {
 	int accept_s;
 };
 
+/* struct event at offset 0 to be able to use convenience macros */
 struct echo_event {
 	struct event e;
 	char buf[BUFSIZE];
@@ -53,10 +54,13 @@ struct clt_event {
 	struct timespec max_duration;
 };
 
+#define SEND_TMO_SECS 1
+#define RECV_TMO_SECS 2
+#define CLT_DELAY_SECS 2
+
 static struct timespec accept_tmo = { .tv_sec = 30, };
-static const struct timespec recv_tmo = { .tv_sec = 2, };
-static const struct timespec send_tmo = { .tv_sec = 1, };
-static const struct timespec clt_tmo = { .tv_sec = 1, };
+static const struct timespec recv_tmo = { .tv_sec = RECV_TMO_SECS, };
+static const struct timespec send_tmo = { .tv_sec = SEND_TMO_SECS, };
 
 static void close_fd(int *pfd)
 {
@@ -96,7 +100,8 @@ static void clt_cleanup(struct event *evt)
 {
 	struct clt_event *clt = container_of(evt, struct clt_event, e);
 
-	close(evt->fd);
+	if (evt->fd != -1)
+		close(evt->fd);
 
 	msg(LOG_NOTICE, "stopped: %u requests, max duration %ld.%06lds\n",
 	    clt->n, clt->max_duration.tv_sec,
@@ -201,13 +206,7 @@ static int client(int num)
 {
 	struct dispatcher *dsp __cleanup__(free_dsp) = NULL;
 	int sfd __cleanup__(close_fd) = -1;
-	struct clt_event clt = {
-		.e.ep.events = 0,
-		.e.callback = clt_callback,
-		.e.cleanup = clt_cleanup,
-		.e.tmo = clt_tmo,
-		.pid = getpid(),
-	};
+	struct clt_event clt = { .n = 0, };
 	sigset_t mask;
 	int rc;
 
@@ -232,12 +231,16 @@ static int client(int num)
 		return -errno;
 	}
 
-	clt.e.fd = sfd;
-	sfd = -1;
+	/* Start with timer. Events will be set on first callback invocation */
+	clt.e = EVENT_W_TMO_ON_STACK(clt_cb, sfd, 0, CLT_DELAY_SECS);
+	clt.e.cleanup = clt_cleanup;
+	clt.pid = getpid();
+
 	if ((rc = event_add(dsp, &clt.e)) < 0) {
 		msg(LOG_ERR, "event_add: %s\n", strerror(-rc));
 		return rc;
 	}
+	sfd = -1;
 
 	sigfillset(&mask);
 	sigdelset(&mask, SIGTERM);
@@ -275,11 +278,6 @@ static int start_clt_cb(struct event *ev, uint32_t events __attribute__((unused)
 
 static int start_clients(struct dispatcher *dsp, const struct cfg *cfg)
 {
-	static const struct event tmpl = {
-		.fd = -1,
-		.callback = start_clt_cb,
-		.cleanup = start_clt_cleanup,
-	};
 	int i;
 
 	for (i = 0; i < cfg->n_clients; i++) {
@@ -288,7 +286,7 @@ static int start_clients(struct dispatcher *dsp, const struct cfg *cfg)
 
 		if (!ev)
 			return -ENOMEM;
-		*ev = tmpl;
+		*ev = TIMER_EVENT_ON_HEAP(start_clt_cb, 0);
 		ev->tmo.tv_nsec = (1 + random() % 10) * 1000000;
 		if ((rc = event_add(dsp, ev)))
 			msg(LOG_ERR, "event_add: %s\n", strerror(-rc));
@@ -344,12 +342,6 @@ static int conn_cb(struct event *ev, uint32_t events)
 	return EVENTCB_CONTINUE;
 }
 
-static void srv_cleanup_cb(struct event *ev __attribute__((unused)))
-{
-	msg(LOG_INFO, "cleanup\n");
-	close(ev->fd);
-}
-
 static int kill_server(void)
 {
 	kill(getpid(), SIGINT);
@@ -359,12 +351,6 @@ static int kill_server(void)
 
 static int accept_cb(struct event *ev, uint32_t events __attribute__((unused)))
 {
-	static const struct event conn_ev_tmpl = {
-		.ep.events = EPOLLIN|EPOLLHUP,
-		.callback = conn_cb,
-		.cleanup = conn_cleanup,
-		.tmo = recv_tmo,
-	};
 	struct echo_event __cleanup__(free_echo) *conn_event = NULL;
 	int cfd __cleanup__(close_fd) = -1;
 	int rc;
@@ -386,8 +372,8 @@ static int accept_cb(struct event *ev, uint32_t events __attribute__((unused)))
 	if ((conn_event = calloc(1, sizeof(*conn_event))) == NULL)
 		return kill_server();
 
-	conn_event->e = conn_ev_tmpl;
-	conn_event->e.fd = cfd;
+	conn_event->e = EVENT_W_TMO_ON_HEAP(conn_cb, cfd, EPOLLIN|EPOLLHUP,
+					    RECV_TMO_SECS);
 
 	if ((rc = event_add(ev->dsp, &conn_event->e)) < 0) {
 		msg(LOG_ERR, "event_add: %s\n", strerror(-rc));
@@ -449,12 +435,7 @@ static int server(const struct cfg *cfg)
 	struct dispatcher *dsp __cleanup__(free_dsp) =
 		new_dispatcher(CLOCK_REALTIME);
 	int fd __cleanup__(close_fd) = -1;
-	struct event srv_event = {
-		.ep.events = EPOLLIN,
-		.callback = accept_cb,
-		.cleanup = srv_cleanup_cb,
-		.tmo = accept_tmo,
-	};
+	struct event srv_event;
 	int rc;
 	sigset_t mask;
 
@@ -486,11 +467,13 @@ static int server(const struct cfg *cfg)
 		return -errno;
 	}
 
-	srv_event.fd = fd;
-	/* prevent __cleanup__ from closing, do this in cleanup() cb */
-	fd = -1;
+	srv_event = EVENT_W_TMO_ON_STACK(accept_cb, fd, EPOLLIN,
+					 cfg->accept_s);
 	if ((rc = event_add(dsp, &srv_event) < 0))
 		return rc;
+
+	/* prevent __cleanup__ from closing, do this in cleanup() cb */
+	fd = -1;
 
 	set_wait_mask(&mask);
 

@@ -72,6 +72,7 @@ typedef int (*cb_fn)(struct event *evt, uint32_t events);
 
 /**
  * Prototype for cleanup callback.
+ * @evt: the event object which registered the callback
  *
  * Called for this event if the event callback returned EVENTCB_CLEANUP, and
  * from cleanup_dispatcher() / free_dispatcher(), for all registered events.
@@ -84,6 +85,23 @@ typedef int (*cb_fn)(struct event *evt, uint32_t events);
  * @evt: the event object which registered the callback
  */
 typedef void (*cleanup_fn)(struct event *evt);
+
+
+/**
+ * cleanup_event_on_stack() - convenience cleanup callback
+ * @evt: the event object which registered the callback
+ *
+ * This cleanup function simply closes @evt->fd.
+ */
+void cleanup_event_on_stack(struct event *evt);
+
+/**
+ * cleanup_event_on_heap() - convenience cleanup callback
+ * @evt: the event object which registered the callback
+ *
+ * This cleanup function closes @evt->fd and frees @eft.
+ */
+void cleanup_event_on_heap(struct event *evt);
 
 /**
  * struct event - data structure for a generic event with timeout
@@ -308,5 +326,52 @@ int dispatcher_get_efd(const struct dispatcher *dsp);
  * created.
  */
 int dispatcher_get_clocksource(const struct dispatcher *dsp);
+
+/**
+ * Convenenience macros for event initialization
+ *
+ * IMPORTANT: The cleanup functionality of the ON_HEAP variants requires
+ * that "struct event" is embedded in the application's data structures
+ * at offset 0.
+ */
+
+#define TIMER_EVENT_ON_STACK(cb, secs)		\
+	((struct event){			\
+		.fd = -1,			\
+		.callback = (cb),		\
+		.tmo.tv_sec = (secs),		\
+	})
+
+#define TIMER_EVENT_ON_HEAP(cb, secs)			\
+	((struct event){				\
+		.fd = -1,				\
+		.callback = (cb),			\
+		.cleanup = cleanup_event_on_heap,	\
+		.tmo.tv_sec = (secs),			\
+	})
+
+#define EVENT_W_TMO_ON_STACK(cb, f, ev, secs)		\
+	((struct event){				\
+		.fd = (f),				\
+		.ep.events = (ev),			\
+		.callback = (cb),			\
+		.cleanup = cleanup_event_on_stack,	\
+		.tmo.tv_sec = (secs),			\
+	})
+
+#define EVENT_ON_STACK(cb, f, ev) \
+	EVENT_W_TMO_ON_STACK(cb, f, ev, 0)
+
+#define EVENT_W_TMO_ON_HEAP(cb, f, ev, secs)		\
+	((struct event){				\
+		.fd = (f),				\
+		.ep.events = (ev),			\
+		.callback = (cb),			\
+		.cleanup = cleanup_event_on_heap,	\
+		.tmo.tv_sec = (secs),			\
+	})
+
+#define EVENT_ON_HEAP(cb, f, ev)			\
+	EVENT_W_TMO_ON_HEAP(cb, f, ev, 0)
 
 #endif

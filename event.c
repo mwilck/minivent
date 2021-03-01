@@ -445,6 +445,22 @@ int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
 	return rc;
 }
 
+void cleanup_event_on_stack(struct event *evt)
+{
+	if (!evt)
+		return;
+	if (evt->fd != -1)
+		close(evt->fd);
+}
+
+void cleanup_event_on_heap(struct event *evt)
+{
+	if (!evt)
+		return;
+	cleanup_event_on_stack(evt);
+	free(evt);
+}
+
 int dispatcher_get_clocksource(const struct dispatcher *dsp)
 {
 	if (!dsp)
