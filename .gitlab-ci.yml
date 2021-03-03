@@ -68,3 +68,30 @@ tough:
   retry: 1
 
 
+build:alpine32:
+  stage: build
+  image: i386/alpine
+  script:
+    - apk add make gcc musl-dev cmocka-dev avahi-dev
+    - make test
+  artifacts:
+    paths:
+      - libminivent.so
+      - test/*-test
+      - test/*-mock
+
+test:alpine32:
+  stage: test
+  image: i386/alpine
+  dependencies:
+    - build:alpine32
+  script:
+    - apk add cmocka strace
+    - export LD_LIBRARY_PATH=$PWD
+    - ./test/ts-test
+    - ./test/tv-test
+    - ./test/mini-test
+    - ./test/array-mock
+    - ./test/event-test -n 10 -t 10 -q
+    - ./test/event-test -n 1 -t 10 -s -q
+    - ./test/echo-test -n 10 -t 10
