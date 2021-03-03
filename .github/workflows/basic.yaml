@@ -1,0 +1,103 @@
+name: basic-ci
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gcc make libcmocka-dev libavahi-core-dev
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build-cov
+        run: make COV=1 test
+      - name: pack-cov
+        run: tar cfv cov-binaries.tar libminivent.so test/*-test test/*-mock ./*.gcno
+      - name: store cov binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: cov-binaries
+          path: cov-binaries.tar
+      - name: clean
+        run: make clean
+      - name: build-opt
+        run: make test
+      - name: pack-opt
+        run: tar cfv binaries.tar libminivent.so test/*-test test/*-mock
+      - name: store binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries
+          path: binaries.tar
+          
+  run-cov:
+    runs-on: ubuntu-18.04
+    needs: build
+    steps:
+      - name: dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libcmocka0 gcovr
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: get cov binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: cov-binaries
+      - name: run tests
+        run: |
+          tar xfv cov-binaries.tar
+          export LD_LIBRARY_PATH=$PWD
+          ./test/ts-test
+          ./test/tv-test
+          ./test/mini-test
+          ./test/array-mock
+          ./test/event-test -n 10 -t 10 -q
+          ./test/event-test -n 1 -t 10 -s -q
+          ./test/echo-test -n 2 -t 10
+          gcovr -r .
+
+  run-valgrind:
+    runs-on: ubuntu-18.04
+    needs: build
+    steps:
+      - name: dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libcmocka0 valgrind
+      - name: get cov binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+      - name: run tests
+        run: |
+          tar xfv binaries.tar
+          export LD_LIBRARY_PATH=$PWD
+          valgrind --leak-check=full ./test/ts-test
+          valgrind --leak-check=full ./test/tv-test
+          valgrind --leak-check=full ./test/mini-test
+          valgrind --leak-check=full ./test/array-mock
+          valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q -a 2000 -m 10000
+          valgrind --leak-check=full ./test/event-test -n 1 -t 10 -s -q
+          valgrind --leak-check=full ./test/echo-test -n 2 -t 10
+
+  run-real:
+    runs-on: ubuntu-18.04
+    needs: build
+    steps:
+      - name: get binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+      - name: run tests
+        run: |
+          tar xfv binaries.tar
+          export LD_LIBRARY_PATH=$PWD
+          ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
+          ./test/event-test -n 1 -t 10 -s -q
+          ./test/echo-test -n 100 -t 10
+          ./test/echo-test -n 1 -t 10 -w 0
+          ./test/echo-test -n 2 -t 10 -w 0
+          ./test/echo-test -n 4 -t 10 -w 0
+          ./test/echo-test -n 8 -t 10 -w 0
