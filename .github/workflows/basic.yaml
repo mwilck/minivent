@@ -78,8 +78,8 @@ jobs:
           valgrind --leak-check=full ./test/tv-test
           valgrind --leak-check=full ./test/mini-test
           valgrind --leak-check=full ./test/array-mock
-          valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q -a 2000 -m 10000
-          valgrind --leak-check=full ./test/event-test -n 1 -t 10 -s -q
+          valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q -a 2500 -m 10000
+          valgrind --leak-check=full ./test/event-test -n 1 -t 10 -s -q -a 2500 -m 10000
           valgrind --leak-check=full ./test/echo-test -n 2 -t 10
 
   run-real:
@@ -94,8 +94,7 @@ jobs:
         run: |
           tar xfv binaries.tar
           export LD_LIBRARY_PATH=$PWD
-          ./test/event-test -n 100 -t 60 -m 1000 -a 400 -q
-          ./test/event-test -n 1 -t 10 -s -q
+          ./test/event-test -n 100 -t 60 -m 5000 -a 400 -q
           ./test/echo-test -n 100 -t 10
           ./test/echo-test -n 1 -t 10 -w 0
           ./test/echo-test -n 2 -t 10 -w 0
