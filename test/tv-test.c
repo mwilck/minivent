@@ -17,8 +17,8 @@ static void tv_random(struct timeval *tv)
 
 static void __attribute__((unused)) tv_print(const struct timeval *tv)
 {
-	fprintf(stderr, "%ld.%06ld ", tv->tv_sec,
-		tv->tv_usec / (1000000L / 1000000L));
+	fprintf(stderr, "%ld.%06ld ", (long)tv->tv_sec,
+		(long)tv->tv_usec / (1000000L / 1000000L));
 };
 
 static int tv_test(void)

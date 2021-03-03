@@ -115,7 +115,7 @@ static void clt_cleanup(struct event *evt)
 		close(evt->fd);
 
 	msg(LOG_NOTICE, "stopped: %u requests, max duration %ld.%06lds\n",
-	    clt->n, clt->max_duration.tv_sec,
+	    clt->n, (long)clt->max_duration.tv_sec,
 	    clt->max_duration.tv_nsec / 1000);
 }
 
@@ -184,7 +184,7 @@ static int clt_cb(struct event *evt, uint32_t events)
 		else {
 			clt->n++;
 			msg(LOG_INFO, "response %u OK, time=%ld.%06lds\n",
-			    clt->n, now.tv_sec, now.tv_nsec / 1000);
+			    clt->n, (long)now.tv_sec, now.tv_nsec / 1000);
 
 			if (ts_compare(&now, &clt->max_duration) > 0)
 				clt->max_duration = now;
@@ -201,7 +201,7 @@ static int clt_cb(struct event *evt, uint32_t events)
 			ts_normalize(&tmo);
 
 			msg(LOG_DEBUG, "response: \"%s\", next in %ld.%06lds\n",
-			    buf, tmo.tv_sec, tmo.tv_nsec / 1000);
+			    buf, (long)tmo.tv_sec, tmo.tv_nsec / 1000);
 		}
 	}
 
@@ -625,7 +625,7 @@ int main(int argc, char * const argv[])
 	ts_subtract(&stop, &start);
 
 	msg(LOG_NOTICE, "#clients: %d, runtime: %ld.%06ld\n",
-	    echo_cfg.n_clients, stop.tv_sec, stop.tv_nsec/1000);
+	    echo_cfg.n_clients, (long)stop.tv_sec, stop.tv_nsec/1000);
 
 	return 0;
 }

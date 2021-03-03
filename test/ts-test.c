@@ -17,8 +17,8 @@ static void ts_random(struct timespec *tv)
 
 static void __attribute__((unused)) ts_print(const struct timespec *tv)
 {
-	fprintf(stderr, "%ld.%06ld ", tv->tv_sec,
-		tv->tv_nsec / (1000000000L / 1000000L));
+	fprintf(stderr, "%ld.%06ld ", (long)tv->tv_sec,
+		(long)tv->tv_nsec / (1000000000L / 1000000L));
 };
 
 static int ts_test(void)

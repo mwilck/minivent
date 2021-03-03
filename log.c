@@ -64,7 +64,7 @@ __msg(int lvl, const char *func, const char *format, ...)
 
 		clock_gettime(LOG_CLOCK, &now);
 		snprintf(timebuf, sizeof(timebuf), "%6ld.%06ld",
-			 now.tv_sec, now.tv_nsec / 1000);
+			 (long)now.tv_sec, now.tv_nsec / 1000);
 	} else
 		*timebuf = '\0';
 

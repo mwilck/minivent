@@ -81,8 +81,8 @@ static long _timeout_rearm(struct timeout_handler *th, long pos)
 	if (ts_compare(&it.it_value, &th->expiry) == 0)
 		return pos;
 
-        msg(LOG_DEBUG, "current: %ld/%ld, expire: %ld.%06ld\n",
-            pos, th->len, it.it_value.tv_sec, it.it_value.tv_nsec / 1000L);
+        msg(LOG_DEBUG, "current: %ld/%zd, expire: %ld.%06ld\n",
+            pos, th->len, (long)it.it_value.tv_sec, it.it_value.tv_nsec / 1000L);
 
         rc = timerfd_settime(th->ev.fd, TFD_TIMER_ABSTIME, &it, NULL);
         if (rc == -1) {
@@ -172,8 +172,8 @@ static int timeout_add_ev(struct timeout_handler *th, struct event *event)
                 return errno ? -errno : -EIO;
         }
 
-        msg(LOG_DEBUG, "new timeout at pos %ld/%ld: %ld.%06ld\n",
-            pos, th->len, event->tmo.tv_sec, event->tmo.tv_nsec / 1000L);
+        msg(LOG_DEBUG, "new timeout at pos %ld/%zd: %ld.%06ld\n",
+            pos, th->len, (long)event->tmo.tv_sec, event->tmo.tv_nsec / 1000L);
 
         if (pos == 0)
                 _timeout_rearm(th, pos);
@@ -207,7 +207,7 @@ static int timeout_cancel_ev(struct timeout_handler *th, struct event *evt)
         }
 
 	msg(LOG_DEBUG, "timeout %ld cancelled, %ld.%06ld\n",
-            pos, ts->tv_sec, ts->tv_nsec / 1000L);
+            pos, (long)ts->tv_sec, ts->tv_nsec / 1000L);
 
 	*ts = null_ts;
         memmove(&th->timeouts[pos], &th->timeouts[pos + 1],
@@ -285,8 +285,8 @@ int timeout_modify(struct event *tmo_event, struct event *evt, struct timespec *
 		th->timeouts[pnew] = &evt->tmo;
 	}
 	msg(LOG_DEBUG, "timeout %ld now at pos %ld, %ld.%06ld -> %ld.%06ld\n",
-            pos, pnew, ts->tv_sec, ts->tv_nsec / 1000L,
-            new->tv_sec, new->tv_nsec / 1000L);
+            pos, pnew, (long)ts->tv_sec, ts->tv_nsec / 1000L,
+            (long)new->tv_sec, new->tv_nsec / 1000L);
 	evt->tmo = *new;
 
 
@@ -305,7 +305,7 @@ static void _timeout_run_callbacks(struct timespec **tss, long n)
                 evt = container_of(tss[i], struct event, tmo);
 
                 msg(LOG_DEBUG, "calling callback %ld (%ld.%06ld)\n", i,
-                    tss[i]->tv_sec, tss[i]->tv_nsec / 1000);
+                    (long)tss[i]->tv_sec, tss[i]->tv_nsec / 1000);
 
 		_event_invoke_callback(evt, REASON_TIMEOUT, 0, true);
         }

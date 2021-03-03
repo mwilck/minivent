@@ -4,6 +4,9 @@
  */
 #ifndef _TV_UTIL_H
 #define _TV_UTIL_H
+#ifndef __GLIBC__
+#include <sys/time.h>
+#endif
 
 /*
  * Utility functions for dealing with "struct timeval".

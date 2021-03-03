@@ -130,10 +130,10 @@ static char *format_ts(const struct timespec *ts, char *buf, size_t sz)
 {
 	if (ts->tv_sec >= 0)
 		snprintf(buf, sz, " %ld.%06lds",
-			 ts->tv_sec % 1000, ts->tv_nsec / 1000);
+			 (long)ts->tv_sec % 1000, ts->tv_nsec / 1000);
 	else
 		snprintf(buf, sz, "-%ld.%06lds",
-			 (-ts->tv_sec - 1) % 1000,
+			 ((long)-ts->tv_sec - 1) % 1000,
 			 (1000000000L - ts->tv_nsec) / 1000);
 	return buf;
 }

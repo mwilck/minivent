@@ -17,7 +17,7 @@ void __attribute__((unused))                                         \
 TT##_print(const TYPE *tv)                                           \
 {                                                                    \
         fprintf(stderr, "%ld.%06ld ",                                \
-                tv->tv_sec, tv->MEMB / (FACT / 1000000L));           \
+                (long)tv->tv_sec, (long)tv->MEMB / (FACT / 1000000L));	\
 }
 
 /*
