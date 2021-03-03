@@ -1,5 +1,10 @@
+variables:
+  DOCKER_IO: "docker.io"
+  MINIVENT_IMG: "fill-in-your-image-here"
+  IMG_32BIT: "i386/alpine"
+
 default:
-  image: registry.suse.de/home/mwilck/images/sle-15-sp2/containers/minevent-test
+  image: $MINIVENT_IMG
   tags:
     - docker
 
@@ -70,7 +75,7 @@ tough:
 
 build:alpine32:
   stage: build
-  image: i386/alpine
+  image: $DOCKER_IO/$IMG_32BIT
   script:
     - apk add make gcc musl-dev cmocka-dev avahi-dev
     - make test
@@ -82,7 +87,7 @@ build:alpine32:
 
 test:alpine32:
   stage: test
-  image: i386/alpine
+  image: $DOCKER_IO/$IMG_32BIT
   dependencies:
     - build:alpine32
   script:
