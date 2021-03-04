@@ -56,6 +56,7 @@ jobs:
           ./test/event-test -n 10 -t 10 -q
           ./test/event-test -n 1 -t 10 -s -q
           ./test/echo-test -n 2 -t 10
+          ./test/dgram-test -n 2 -t 10
           gcovr -r .
 
   run-valgrind:
@@ -81,6 +82,7 @@ jobs:
           valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q -a 2500 -m 10000
           valgrind --leak-check=full ./test/event-test -n 1 -t 10 -s -q -a 2500 -m 10000
           valgrind --leak-check=full ./test/echo-test -n 2 -t 10
+          valgrind --leak-check=full ./test/dgram-test -n 2 -t 10
 
   run-real:
     runs-on: ubuntu-18.04
@@ -100,6 +102,11 @@ jobs:
           ./test/echo-test -n 2 -t 10 -w 0
           ./test/echo-test -n 4 -t 10 -w 0
           ./test/echo-test -n 8 -t 10 -w 0
+          ./test/dgram-test -n 100 -t 10
+          ./test/dgram-test -n 1 -t 10 -w 0
+          ./test/dgram-test -n 2 -t 10 -w 0
+          ./test/dgram-test -n 4 -t 10 -w 0
+          ./test/dgram-test -n 8 -t 10 -w 0
 
   build-alpine32:
     runs-on: ubuntu-20.04

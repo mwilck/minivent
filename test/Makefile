@@ -8,9 +8,10 @@ MINI-TEST-OBJS := mini-test.o
 TS-TEST_OBJS := ts-test.o
 TV-TEST_OBJS := tv-test.o
 ECHO-TEST-OBJS := echo-test.o 
+DGRAM-TEST-OBJS := dgram-test.o 
 OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS) \
-	$(ECHO-TEST-OBJS) $(MINI-TEST_OBJS)
-ALL_TESTS := event-test ts-test tv-test avahi-test echo-test array-mock mini-test
+	$(ECHO-TEST-OBJS) $(DGRAM-TEST-OBJS) $(MINI-TEST_OBJS)
+ALL_TESTS := event-test ts-test tv-test avahi-test echo-test dgram-test array-mock mini-test
 
 all:	$(ALL_TESTS)
 
@@ -38,6 +39,9 @@ avahi-test:	$(AVAHI-TEST_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs avahi-core) $(LIBS)
 
 echo-test:	$(ECHO-TEST-OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+dgram-test:	$(DGRAM-TEST-OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 ts-test.c:	time-test-inc.c time-test.c

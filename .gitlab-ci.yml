@@ -42,6 +42,7 @@ coverage:
     - ./test/event-test -n 10 -t 10 -q
     - ./test/event-test -n 1 -t 10 -s -q
     - ./test/echo-test -n 2 -t 10
+    - ./test/dgram-test -n 2 -t 10
     - gcovr -r .
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
 
@@ -56,6 +57,7 @@ valgrind:
     - valgrind --leak-check=full ./test/array-mock
     - valgrind --leak-check=full ./test/event-test -n 50 -t 10 -q
     - valgrind --leak-check=full ./test/echo-test -n 2 -t 10
+    - valgrind --leak-check=full ./test/dgram-test -n 2 -t 10
 
 tough:
   stage: test
@@ -70,6 +72,12 @@ tough:
     - ./test/echo-test -n 1 -t 10 -w 0
     - ./test/echo-test -n 2 -t 10 -w 0
     - ./test/echo-test -n 4 -t 10 -w 0
+    - ./test/echo-test -n 8 -t 10 -w 0
+    - ./test/dgram-test -n 100 -t 60
+    - ./test/dgram-test -n 1 -t 10 -w 0
+    - ./test/dgram-test -n 2 -t 10 -w 0
+    - ./test/dgram-test -n 4 -t 10 -w 0
+    - ./test/dgram-test -n 8 -t 10 -w 0
   retry: 1
 
 
@@ -100,3 +108,4 @@ test:alpine32:
     - ./test/event-test -n 10 -t 10 -q
     - ./test/event-test -n 1 -t 10 -s -q
     - ./test/echo-test -n 10 -t 10
+    - ./test/dgram-test -n 10 -t 10
