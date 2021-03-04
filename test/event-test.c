@@ -437,7 +437,7 @@ static int do_test(const char *name,
 	set_wait_mask(&ep_mask);
 
 	if (!stop_signal) {
-		ev_stop = TIMER_EVENT_ON_STACK(fini_cb, runtime);
+		ev_stop = TIMER_EVENT_ON_STACK(fini_cb, runtime * 1000000);
 		if (event_add(dsp, &ev_stop))
 			msg(LOG_ERR, "failed to add stop event: %m\n");
 	} else {

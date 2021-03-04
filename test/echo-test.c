@@ -82,7 +82,6 @@ static DEFINE_CLEANUP_FUNC(free_dsp, struct dispatcher *,
 			   free_dispatcher);
 
 static DEFINE_CLEANUP_FUNC(free_echo, struct echo_event *, free);
-static DEFINE_CLEANUP_FUNC(free_ev, struct event *, free);
 
 static int set_socketflags(int fd)
 {
@@ -247,8 +246,8 @@ static int client(int num)
 	}
 
 	/* Start with timer. Events will be set on first callback invocation */
-	clt.e = EVENT_W_TMO_ON_STACK(clt_cb, sfd, 0, CLT_DELAY_SECS);
-	clt.e.tmo.tv_nsec = 100;
+	clt.e = EVENT_W_TMO_ON_STACK(clt_cb, sfd, 0,
+				     CLT_DELAY_SECS * 1000000 + 1);
 	clt.e.cleanup = clt_cleanup;
 	clt.pid = getpid();
 
@@ -270,45 +269,44 @@ static int client(int num)
 	return (rc == -EINTR ? 0 : -rc);
 }
 
-static int start_clt_cb(struct event *ev, uint32_t events __attribute__((unused)))
+static void start_clt(void *arg)
 {
+	struct dispatcher *dsp = arg;
 	pid_t pid;
-	struct dispatcher *dsp = ev->dsp;
 	static int num;
 
 	num++;
 	if ((pid = fork()) == -1) {
 		msg(LOG_ERR, "fork: %m\n");
-		return EVENTCB_CLEANUP;
+		return;
 	} else if (pid > 0)
-		return EVENTCB_CLEANUP;
+		return;
 
 	/* No return to the dispatcher from here */
 	free_dispatcher(dsp);
 
 	exit (client(num));
-
-	/* never reached */
-	return EVENTCB_CONTINUE;
 }
+
+static DEFINE_CLEANUP_FUNC(free_tim, struct timer_event *, free);
 
 static int start_clients(struct dispatcher *dsp)
 {
 	int i;
 
 	for (i = 0; i < echo_cfg.n_clients; i++) {
-		struct event *ev __cleanup__(free_ev) = calloc(1, sizeof(*ev));
+		struct timer_event *tim __cleanup__(free_tim);
 		int rc;
 
-		if (!ev)
+		tim = calloc(1, sizeof(*tim));
+		if (!tim)
 			return -ENOMEM;
-		*ev = TIMER_EVENT_ON_HEAP(start_clt_cb, 0);
-		ev->tmo.tv_nsec = (1 + random() % 10) * 1000000;
-		if ((rc = event_add(dsp, ev)))
+		*tim = TIMER_ON_HEAP(start_clt, dsp, (random() % 11) * 1000);
+		if ((rc = event_add(dsp, &tim->e)))
 			msg(LOG_ERR, "event_add: %s\n", strerror(-rc));
 		else {
 			msg(LOG_INFO, "client %d scheduled\n", i);
-			ev = NULL;
+			tim = NULL;
 		}
 	}
 	return 0;
@@ -395,7 +393,7 @@ static int accept_cb(struct event *ev, uint32_t events __attribute__((unused)))
 		return kill_server();
 
 	conn_event->e = EVENT_W_TMO_ON_HEAP(conn_cb, cfd, EPOLLIN|EPOLLHUP,
-					    RECV_TMO_SECS);
+					    RECV_TMO_SECS * 1000000);
 
 	if ((rc = event_add(ev->dsp, &conn_event->e)) < 0) {
 		msg(LOG_ERR, "event_add: %s\n", strerror(-rc));
@@ -497,7 +495,7 @@ static int server(void)
 	}
 
 	srv_event = EVENT_W_TMO_ON_STACK(accept_cb, fd, EPOLLIN,
-					 echo_cfg.accept_s);
+					 echo_cfg.accept_s * 1000000);
 	if ((rc = event_add(dsp, &srv_event) < 0))
 		return rc;
 

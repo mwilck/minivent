@@ -4,6 +4,7 @@
  */
 #ifndef _EVENT_H
 #define _EVENT_H
+#include <stddef.h>
 #include <sys/epoll.h>
 
 struct event;
@@ -335,43 +336,125 @@ int dispatcher_get_clocksource(const struct dispatcher *dsp);
  * at offset 0.
  */
 
-#define TIMER_EVENT_ON_STACK(cb, secs)		\
-	((struct event){			\
-		.fd = -1,			\
-		.callback = (cb),		\
-		.tmo.tv_sec = (secs),		\
-	})
-
-#define TIMER_EVENT_ON_HEAP(cb, secs)			\
-	((struct event){				\
-		.fd = -1,				\
-		.callback = (cb),			\
-		.cleanup = cleanup_event_on_heap,	\
-		.tmo.tv_sec = (secs),			\
-	})
-
-#define EVENT_W_TMO_ON_STACK(cb, f, ev, secs)		\
+/**
+ * __EVENT_INIT() - generic timer initializer
+ */
+#define __EVENT_INIT(cb, cln, f, ev, s, ns)		\
 	((struct event){				\
 		.fd = (f),				\
 		.ep.events = (ev),			\
 		.callback = (cb),			\
-		.cleanup = cleanup_event_on_stack,	\
-		.tmo.tv_sec = (secs),			\
+		.cleanup = (cln),			\
+		.tmo.tv_sec  = (s),			\
+		.tmo.tv_nsec = (ns),			\
 	})
 
+/**
+ * EVENT_W_TMO_ON_STACK() - initializer for struct event
+ * @cb: callback of type @cb_fn
+ * @f:  file descriptor
+ * @ev: epoll event mask
+ * @us: timeout in microseconds, must be non-negative
+ */
+#define EVENT_W_TMO_ON_STACK(cb, f, ev, us)			\
+	__EVENT_INIT(cb, cleanup_event_on_stack, f, ev,		\
+		     (us) / 1000000L, (us) % 1000000L * 1000)
+
+/**
+ * EVENT_ON_STACK() - initializer for struct event
+ * @cb: callback of type @cb_fn
+ * @f:  file descriptor
+ * @ev: epoll event mask
+ *
+ * The initialized event has no timeout.
+ */
 #define EVENT_ON_STACK(cb, f, ev) \
 	EVENT_W_TMO_ON_STACK(cb, f, ev, 0)
 
-#define EVENT_W_TMO_ON_HEAP(cb, f, ev, secs)		\
-	((struct event){				\
-		.fd = (f),				\
-		.ep.events = (ev),			\
-		.callback = (cb),			\
-		.cleanup = cleanup_event_on_heap,	\
-		.tmo.tv_sec = (secs),			\
-	})
+/**
+ * TIMER_EVENT_ON_STACK() - initializer for struct event
+ * @cb: callback of type @cb_fn
+ * @us: timeout in microseconds, must be non-negative
+ * NOTE: it's pointless to set a timeout of 0 us (timer inactive),
+ *       thus the code sets it to 1ns at least.
+ * Thus, by passing us = 0, an event is created that will fire
+ * immediately after calling event_wait() or event_loop().
+ */
+#define TIMER_EVENT_ON_STACK(cb, us)				\
+	__EVENT_INIT(cb, cleanup_event_on_stack, -1, 0,		\
+		     (us) / 1000000L, (us) % 1000000L * 1000 + 1)
 
+/**
+ * EVENT_W_TMO_ON_HEAP() - initializer for struct event
+ * Like EVENT_W_TMO_ON_STACK(), but the cleanup callback
+ * will free the struct event.
+ */
+#define EVENT_W_TMO_ON_HEAP(cb, f, ev, us)			\
+	__EVENT_INIT(cb, cleanup_event_on_heap, f, ev,		\
+		     (us) / 1000000L, (us) % 1000000L * 1000)
+
+/**
+ * EVENT_ON_HEAP() - initializer for struct event
+ * Like EVENT_ON_STACK(), but the cleanup callback
+ * will free the struct event.
+ */
 #define EVENT_ON_HEAP(cb, f, ev)			\
 	EVENT_W_TMO_ON_HEAP(cb, f, ev, 0)
+
+/**
+ * TIMER_EVENT_ON_HEAP() - initializer for struct event
+ * Like TIMER_EVENT_ON_STACK(), but the cleanup callback
+ * will free the struct event.
+ */
+#define TIMER_EVENT_ON_HEAP(cb, us)				\
+	__EVENT_INIT(cb, cleanup_event_on_heap, -1, 0,		\
+		     (us) / 1000000L, (us) % 1000000L * 1000 + 1)
+
+/**
+ * timer_cb - prototype for a generic single-shot timer callback
+ * Use the TIMER macros below.
+ */
+typedef void (*timer_cb)(void *arg);
+
+/**
+ * _call_timer_cb() - helper for invoking timer callbacks
+ *
+ * Internal use.
+ */
+int _call_timer_cb(struct event *, uint32_t events);
+
+/**
+ * struct timer_event - helper struct for invoking timer callbacks
+ */
+struct timer_event {
+	struct event e;
+	timer_cb timer_fn;
+	void *timer_arg;
+};
+
+/**
+ * TIMER_ON_STACK() - initializer for a single-shot timer
+ * @fn: callback of type @timer_cb
+ * @arg: argument to pass to @fn
+ * @us: timeout in microseconds
+ */
+#define TIMER_ON_STACK(fn, arg, us)					\
+	((struct timer_event){						\
+		.e = TIMER_EVENT_ON_STACK(_call_timer_cb, us),		\
+		.timer_fn = fn,						\
+		.timer_arg = arg,					\
+	})
+
+/**
+ * TIMER_ON_HEAP() - initializer for a single-shot timer
+ * Like TIMER_ON_STACK(), but the cleanup callback
+ * will free the struct event.
+ */
+#define TIMER_ON_HEAP(fn, arg, us)					\
+	((struct timer_event){						\
+		.e = TIMER_EVENT_ON_HEAP(_call_timer_cb, us),		\
+		.timer_fn = fn,						\
+		.timer_arg = arg,					\
+	})
 
 #endif

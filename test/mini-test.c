@@ -39,7 +39,7 @@ int main(void)
 	sigdelset(&mask, SIGINT);
 
 	dsp = new_dispatcher(CLOCK_REALTIME);
-	evt = TIMER_EVENT_ON_STACK(cb, 1);
+	evt = TIMER_EVENT_ON_STACK(cb, 1000000);
 	event_add(dsp, &evt);
 	event_loop(dsp, &mask, NULL);
 	free_dispatcher(dsp);

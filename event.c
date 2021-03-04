@@ -461,6 +461,17 @@ void cleanup_event_on_heap(struct event *evt)
 	free(evt);
 }
 
+int _call_timer_cb(struct event *evt, uint32_t events __attribute__((unused)))
+{
+	struct timer_event *tim = container_of(evt, struct timer_event, e);
+
+	if (!evt)
+		return -EINVAL;
+
+	tim->timer_fn(tim->timer_arg);
+	return EVENTCB_CLEANUP;
+}
+
 int dispatcher_get_clocksource(const struct dispatcher *dsp)
 {
 	if (!dsp)

@@ -126,14 +126,13 @@ callback after one second:
     static int cb(struct event *evt, uint32_t events)
     {
             fprintf(stderr, "Hello world! (%s)\n", reason_str[evt->reason]);
-            /* "commit suicide" */
             kill(getpid(), SIGINT);
             return EVENTCB_CLEANUP;
     }
     
     int main(void) {
             struct dispatcher *dsp = new_dispatcher(CLOCK_REALTIME);
-            struct event *evt = TIMER_EVENT_ON_STACK(cb, 1);
+            struct event *evt = TIMER_EVENT_ON_STACK(cb, 1000000);
     
             event_add(dsp, &evt);
             event_loop(dsp, &mask, NULL);
