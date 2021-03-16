@@ -338,6 +338,11 @@ int timeout_event(struct event *tmo_ev, uint32_t events)
 
         /*
          * callbacks may add new timers, therefore we must iterate here.
+	 * Also, we can't simply run _timeout_run_callbacks(th->timeouts),
+	 * because the array might be changed under us. Therefore allocate
+	 * a new array for the expired timers and iterate over it.
+	 * Note: If the callback forks, this array might never be freed and
+	 * valgrind may report some bytes "still reachable".
          */
         while (th->len > 0) {
 
