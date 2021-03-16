@@ -1,0 +1,44 @@
+name: ci-32bit
+on: push
+jobs:
+  build-alpine32:
+    runs-on: ubuntu-20.04
+    container: i386/alpine:latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - name: dependencies
+        run: |
+          apk add make gcc musl-dev cmocka-dev avahi-dev
+      - name: build-opt
+        run: make test
+      - name: pack-opt
+        run: tar cfv binaries.tar libminivent.so test/*-test test/*-mock
+      - name: store binaries
+        uses: actions/upload-artifact@v1
+        with:
+          name: binaries-alpine32
+          path: binaries.tar
+
+  run-alpine32:
+    runs-on: ubuntu-20.04
+    container: i386/alpine:latest
+    needs: build-alpine32
+    steps:
+      - name: dependencies
+        run: |
+          apk add cmocka
+      - name: get binaries
+        uses: actions/download-artifact@v1
+        with:
+          name: binaries-alpine32
+      - name: run tests
+        run: |
+          tar xfv binaries-alpine32/binaries.tar
+          export LD_LIBRARY_PATH=$PWD
+          ./test/event-test -n 100 -t 60 -m 5000 -a 400 -q
+          ./test/echo-test -n 100 -t 10
+          ./test/echo-test -n 1 -t 10 -w 0
+          ./test/echo-test -n 2 -t 10 -w 0
+          ./test/echo-test -n 4 -t 10 -w 0
+          ./test/echo-test -n 8 -t 10 -w 0
