@@ -92,7 +92,7 @@ static int _dispatcher_add(struct dispatcher *dsp, struct event *evt)
 	dsp->events[dsp->n] = evt;
 	dsp->n++;
 	msg(LOG_DEBUG, "new event @%u, %u/%u/%u free\n",
-	    dsp->n, dsp->free, dsp->n, dsp->len);
+	    dsp->n - 1, dsp->free, dsp->n, dsp->len);
 	return 0;
 }
 
@@ -150,7 +150,8 @@ static int _dispatcher_gc(struct dispatcher *dsp) {
 	return 0;
 }
 
-static int _dispatcher_remove(struct dispatcher *dsp, struct event *ev)
+static int _dispatcher_remove(struct dispatcher *dsp, struct event *ev,
+			      bool do_gc)
 {
 	unsigned int i;
 
@@ -168,10 +169,10 @@ static int _dispatcher_remove(struct dispatcher *dsp, struct event *ev)
 	msg(LOG_DEBUG, "removed event @%u, %u/%u/%u free\n",
 	    i, dsp->free, dsp->n, dsp->len);
 
-	return _dispatcher_gc(dsp);
+	return do_gc ? _dispatcher_gc(dsp) : 0;
 }
 
-int _event_remove(struct event *evt)
+int _event_remove_epoll(struct event *evt)
 {
 	if (evt->fd != -1) {
 		int rc = epoll_ctl(evt->dsp->epoll_fd, EPOLL_CTL_DEL, evt->fd, NULL);
@@ -194,7 +195,7 @@ static void _run_cleanup_handlers(struct dispatcher *dsp, bool do_epoll)
 			continue;
 
 		if (do_epoll)
-			_event_remove(evt);
+			_event_remove_epoll(evt);
 		if (evt->cleanup)
 			evt->cleanup(evt);
 	}
@@ -281,7 +282,7 @@ static int _event_add(struct dispatcher *dsp, struct event *evt)
 	if (evt->fd != -1 &&
 	    epoll_ctl(dsp->epoll_fd, EPOLL_CTL_ADD, evt->fd, &evt->ep) == -1) {
 		msg(LOG_ERR, "failed to add event: %m\n");
-		_dispatcher_remove(evt->dsp, evt);
+		_dispatcher_remove(evt->dsp, evt, true);
 		return -errno;
 	}
 	evt->dsp = dsp;
@@ -302,22 +303,27 @@ int event_add(struct dispatcher *dsp, struct event *evt)
 	return _event_add(dsp, evt);
 }
 
-int event_remove(struct event *evt)
+static int _event_remove(struct event *evt, bool do_gc)
 {
 	int rc;
 
 	if (!evt || !evt->dsp)
 		return -EINVAL;
 
-	rc = _event_remove(evt);
+	rc = _event_remove_epoll(evt);
 	if (rc == -1)
 		rc = -errno;
 
-	_dispatcher_remove(evt->dsp, evt);
+	_dispatcher_remove(evt->dsp, evt, do_gc);
 	timeout_cancel(evt->dsp->timeout_event, evt);
 	evt->dsp = NULL;
 
 	return rc;
+}
+
+int event_remove(struct event *evt)
+{
+	return _event_remove(evt, true);
 }
 
 int event_mod_timeout(struct event *evt, const struct timespec *tmo)
@@ -362,32 +368,34 @@ void _event_invoke_callback(struct event *ev, unsigned short reason,
 	int rc;
 
 	if (ev->reason) {
-		msg(LOG_INFO, "skipping callback for %s because of %s\n",
+		msg(LOG_DEBUG, "skipping callback for %s because of %s\n",
 		    reason_str[reason], reason_str[ev->reason]);
+		return;
+	}
+	if (ev->flags & (__EV_CLEANUP|__EV_REMOVE)) {
+		msg(LOG_DEBUG, "skipping callback for %s, event scheduled for removal\n",
+		    reason_str[reason]);
 		return;
 	}
 
 	ev->reason = reason;
 	rc = ev->callback(ev, events);
 
-	if (rc == EVENTCB_CLEANUP) {
-		msg(LOG_DEBUG, "cleaning out event\n");
-		event_remove(ev);
-		if (ev->cleanup)
-			ev->cleanup(ev);
-	} else if (rc == EVENTCB_REMOVE) {
-		msg(LOG_DEBUG, "removing event\n");
-		event_remove(ev);
-		ev->reason = 0;
-	} else if (reset_reason)
+	if (rc == EVENTCB_CLEANUP)
+		ev->flags |= __EV_CLEANUP;
+	else if (rc == EVENTCB_REMOVE)
+		ev->flags |= __EV_REMOVE;
+	if (reset_reason)
 		ev->reason = 0;
 }
 
 
-int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
+int event_wait(struct dispatcher *dsp, const sigset_t *sigmask)
 {
 	int ep_fd = dispatcher_get_efd(dsp);
 	int rc, i;
+	unsigned int j;
+	bool removed = false;
 	struct epoll_event events[MAX_EVENTS];
 	struct epoll_event *tmo_event = NULL;
 
@@ -425,13 +433,28 @@ int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask)
 
 	for (i = 0; i < rc; i++) {
 		struct event *ev = events[i].data.ptr;
+
 		ev->reason = 0;
 	}
+
+	for (j = 0; j < dsp->n; j++) {
+		struct event *ev = dsp->events[j];
+
+		if (ev && (ev->flags & (__EV_REMOVE | __EV_CLEANUP))) {
+			msg(LOG_DEBUG, "cleaning out event %u\n", j);
+			_event_remove(ev, false);
+			if (ev->flags & __EV_CLEANUP && ev->cleanup)
+				ev->cleanup(ev);
+			removed = true;
+		}
+	}
+	if (removed)
+		_dispatcher_gc(dsp);
 
 	return ELOOP_CONTINUE;
 }
 
-int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
+int event_loop(struct dispatcher *dsp, const sigset_t *sigmask,
 	       int (*err_handler)(int err))
 {
 	int rc;

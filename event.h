@@ -48,6 +48,9 @@ enum {
 	 * Used in event_add() and event_modify_timeout()
 	 */
 	TMO_ABS = 1,
+	/* the flags below are for internal use only, don't touch them */
+	__EV_REMOVE = (1 << 8),
+	__EV_CLEANUP = (1 << 9),
 };
 
 /**
@@ -237,7 +240,7 @@ void _event_invoke_callback(struct event *, unsigned short, unsigned int, bool);
  * Return: 0 on success, a negative error code (-errno) on failure,
  * which might be -EINTR.
  */
-int event_wait(const struct dispatcher *dsp, const sigset_t *sigmask);
+int event_wait(struct dispatcher *dsp, const sigset_t *sigmask);
 
 /**
  * Return codes for err_handler in event_loop()
@@ -265,7 +268,7 @@ enum {
  * Return: 0 on success, or negative error code (-errno) on failure.
  * In particular, it returns -EINTR if interrupted by caught signal.
  */
-int event_loop(const struct dispatcher *dsp, const sigset_t *sigmask,
+int event_loop(struct dispatcher *dsp, const sigset_t *sigmask,
 	       int (*err_handler)(int err));
 
 /**
