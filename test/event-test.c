@@ -98,7 +98,7 @@ static void disable_2(bool *disabled)
  */
 static void start_event_3(int i __attribute__((unused)),
 			  struct itimerspec *it,
-			  unsigned short *flags __attribute__((unused)))
+			  unsigned short *flags)
 {
 	struct timespec now;
 
