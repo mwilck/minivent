@@ -17,12 +17,18 @@ CFLAGS += $(INCLUDE) $(COMMON_CFLAGS) $(COV_CFLAGS) -fPIC
 
 LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o
 LIB := libminivent.so
+STATIC := libminivent.a
 OBJS = $(LIBEV_OBJS)
 
 .PHONY:	test
 
 $(LIB):	$(LIBEV_OBJS)
 	$(CC) $(LDFLAGS) -shared -o $@ $^
+
+static:	$(STATIC)
+
+$(STATIC):	$(LIBEV_OBJS)
+	$(AR) r $@ $^
 
 ts-util.c:	time-inc.c time-util.c
 	cat time-inc.c >$@
@@ -42,6 +48,6 @@ run-test: test
 
 clean:
 	$(MAKE) -C test clean
-	$(RM) *.o *~ $(LIB) *.d *.gcno *.gcda *.gcov
+	$(RM) *.o *~ $(LIB) $(STATIC) *.d *.gcno *.gcda *.gcov
 
 include $(wildcard $(OBJS:.o=.d))

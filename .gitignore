@@ -5,6 +5,7 @@
 *.d
 cscope.files
 cscope.out
+libminivent.a
 libminivent.so
 perf.data*
 *.gcno
