@@ -2,8 +2,8 @@
  * Copyright (c) 2021 Martin Wilck, SUSE LLC
  * SPDX-License-Identifier: LGPL-2.1-or-newer
  */
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef _COMMON_H
+#define _COMMON_H
 
 /**
  * container_of - cast a member of a structure out to the containing structure

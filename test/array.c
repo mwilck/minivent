@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <syslog.h>
 #include <time.h>
-#include "../log.h"
+#include "log.h"
 #include "../event.h"
 
 #define LEN_CHUNK 8

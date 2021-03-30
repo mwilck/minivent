@@ -11,7 +11,7 @@
 #include <string.h>
 #include <limits.h>
 #include "log.h"
-#include "util.h"
+#include "common.h"
 #include "cleanup.h"
 #include "event.h"
 #include "timeout.h"

@@ -21,9 +21,9 @@
 #include <errno.h>
 #include <getopt.h>
 
-#include "../util.h"
-#include "../log.h"
-#include "../cleanup.h"
+#include "common.h"
+#include "log.h"
+#include "cleanup.h"
 #include "../ts-util.h"
 #include "../event.h"
 

@@ -14,7 +14,7 @@
 #include <sys/time.h>
 #include <sys/timerfd.h>
 #include <syslog.h>
-#include "util.h"
+#include "common.h"
 #include "ts-util.h"
 #include "log.h"
 #include "timeout.h"

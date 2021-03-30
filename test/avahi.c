@@ -12,10 +12,10 @@
 #include <avahi-common/timeval.h>
 #include <avahi-common/watch.h>
 
-#include "../log.h"
+#include "log.h"
 #include "../event.h"
 #include "avahi.h"
-#include "../util.h"
+#include "common.h"
 
 #ifndef HOST_NAME_MAX
 # include <limits.h>

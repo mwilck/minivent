@@ -1,3 +1,6 @@
+# Override this with a list of directories to search for includes
+INCLUDE ?= -Iexternal
+export INCLUDE
 ifeq ($(COV),1)
 OPTFLAGS := -O0
 COV_CFLAGS += -fprofile-arcs -ftest-coverage -fPIC
@@ -10,9 +13,9 @@ COMMON_CFLAGS += $(OPTFLAGS)
 COMMON_CFLAGS += "-DLOG_CLOCK=CLOCK_REALTIME" -DLOG_FUNCNAME=1 -g -std=gnu99 $(WARNFLAGS) -MMD -MP
 export COMMON_CFLAGS
 export LDFLAGS
-CFLAGS += $(COMMON_CFLAGS) $(COV_CFLAGS) -fPIC
+CFLAGS += $(INCLUDE) $(COMMON_CFLAGS) $(COV_CFLAGS) -fPIC
 
-LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o log.o cleanup.o
+LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o
 LIB := libminivent.so
 OBJS = $(LIBEV_OBJS)
 
