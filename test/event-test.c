@@ -28,7 +28,7 @@
 static int n_events = DEF_N_EVENTS;
 
 /* desired runtime */
-#define DEF_RUNTIME 60
+#define DEF_RUNTIME 20
 static int runtime = DEF_RUNTIME;
 
 /* Error thresholds for callback delay */
