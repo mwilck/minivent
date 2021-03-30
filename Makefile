@@ -1,6 +1,9 @@
 # Override this with a list of directories to search for includes
 INCLUDE ?= -Iexternal
 export INCLUDE
+# Set this to a non-empty string to disable struct timeval support
+DISABLE_TV ?=
+export DISABLE_TV
 ifeq ($(COV),1)
 OPTFLAGS := -O0
 COV_CFLAGS += -fprofile-arcs -ftest-coverage -fPIC
@@ -15,7 +18,7 @@ export COMMON_CFLAGS
 export LDFLAGS
 CFLAGS += $(INCLUDE) $(COMMON_CFLAGS) $(COV_CFLAGS) -fPIC
 
-LIBEV_OBJS := event.o timeout.o ts-util.o tv-util.o
+LIBEV_OBJS := event.o timeout.o ts-util.o $(if $(DISABLE_TV),,tv-util.o)
 LIB := libminivent.so
 STATIC := libminivent.a
 OBJS = $(LIBEV_OBJS)

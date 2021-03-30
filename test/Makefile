@@ -16,7 +16,8 @@ ECHO-TEST-OBJS := echo-test.o $(EXT_OBJS)
 DGRAM-TEST-OBJS := dgram-test.o $(EXT_OBJS)
 OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS) \
 	$(ECHO-TEST-OBJS) $(DGRAM-TEST-OBJS) $(MINI-TEST-OBJS)
-ALL_TESTS := event-test ts-test tv-test avahi-test echo-test dgram-test array-mock mini-test
+ALL_TESTS := event-test ts-test $(if $(DISABLE_TV),,tv-test) avahi-test \
+	echo-test dgram-test array-mock mini-test
 
 all:	$(ALL_TESTS)
 
