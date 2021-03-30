@@ -25,6 +25,28 @@ The test programs are released under [GNU GPL](LICENSE.test.txt), version 2.0 or
 Run `make`. Run `make test` to build the test programs, and `make run-test` to
 run all test programs.
 
+### External sources
+
+**minivent** relies on some generic functionality which your program is
+likely to have already. To avoid duplicate implementation and allow for
+consistent behavior in the application, this functionality can either be
+pulled from the application, or created from sources in the `external/`
+subdirectory:
+
+ * `common.h` - some generic utilities
+ * `log.h`, `log.c` - logging functions
+ * `cleanup.h`, `cleanup.c` - syntactic sugar for `__attribute__((cleanup()))`
+ 
+By default, the build process uses the implementation in the `external/`
+subdirectory. This can be overridden by setting environment variables:
+
+ * `INCLUDE` - Include path (space separated list of directories relative to
+   the minivent top directory, with `-I` prefix). Defaults to `-Iexternal`.
+ * `LOG_O` - object file that provides the logging functionality. This can be
+   an empty string. The minivent code only uses the `msg()` macro (see `log.h`).
+ * `CLEANUP_O` - object file that provides the cleanup functionality. Can be
+   set to an empty string.
+
 ### Build dependencies
 
 The library itself depends only on functionality provided by the C
