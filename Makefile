@@ -4,16 +4,19 @@ export INCLUDE
 # Set this to a non-empty string to disable struct timeval support
 DISABLE_TV ?=
 export DISABLE_TV
+# Set this to override library defaults
+DEFINES ?= "-DLOG_CLOCK=CLOCK_REALTIME" -DLOG_FUNCNAME=1
+
+# Set OPTFLAGS to override optimization parameters
 ifeq ($(COV),1)
-OPTFLAGS := -O0
+OPTFLAGS ?= -O0 -g
 COV_CFLAGS += -fprofile-arcs -ftest-coverage -fPIC
 LDFLAGS += -fprofile-arcs
 else
-OPTFLAGS := -O2
+OPTFLAGS ?= -O2 -g
 endif
 WARNFLAGS := -Wall -Wextra -Werror
-COMMON_CFLAGS += $(OPTFLAGS)
-COMMON_CFLAGS += "-DLOG_CLOCK=CLOCK_REALTIME" -DLOG_FUNCNAME=1 -g -std=gnu99 $(WARNFLAGS) -MMD -MP
+COMMON_CFLAGS += $(OPTFLAGS) $(DEFINES) -std=gnu99 $(WARNFLAGS) -MMD -MP
 export COMMON_CFLAGS
 export LDFLAGS
 CFLAGS += $(INCLUDE) $(COMMON_CFLAGS) $(COV_CFLAGS) -fPIC
