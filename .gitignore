@@ -14,3 +14,4 @@ perf.data*
 test/*.o.wrap
 test/*-mock
 test/*-test
+test/*.out

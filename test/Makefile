@@ -17,51 +17,64 @@ DGRAM-TEST-OBJS := dgram-test.o $(EXT_OBJS)
 OBJS = $(EVENT-TEST_OBJS) $(AVAHI-TEST_OBS) $(TS-TEST_OBJS) $(TV-TEST_OBJS) \
 	$(ECHO-TEST-OBJS) $(DGRAM-TEST-OBJS) $(MINI-TEST-OBJS)
 ALL_TESTS := event-test ts-test $(if $(DISABLE_TV),,tv-test) avahi-test \
-	echo-test dgram-test array-mock mini-test
+	echo-test dgram-test mini-test
+ALL_MOCKS := array-mock
 
-all:	$(ALL_TESTS)
+ifneq ($(findstring $(MAKEFLAGS),s),s)
+ifndef V
+	QUIET_CC	= @echo '   ' CC $@;
+	QUIET_RUN	= @echo '   ' RUN $<;
+endif
+endif
 
-run:	all
-	@for i in $(ALL_TESTS); do \
-		echo == running $$i == >&2; \
-		LD_LIBRARY_PATH=.. ./$$i; \
-	done
+%.o:	%.c
+	$(QUIET_CC) $(CC) $(CFLAGS) -c -o $@ $<
+
+%.out:	%-test
+	$(QUIET_RUN) LD_LIBRARY_PATH=.. ./$< >$@ 2>&1
+
+%.out:	%-mock
+	$(QUIET_RUN) LD_LIBRARY_PATH=.. ./$< >$@ 2>&1
+
+all:	$(ALL_TESTS) $(ALL_MOCKS)
+
+run:	$(ALL_TESTS:%-test=%.out) $(ALL_MOCKS:%-mock=%.out)
 
 event-test:     $(EVENT-TEST_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS) -lm
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS) -lm
 
 ts-test:    $(TS-TEST_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 tv-test:    $(TV-TEST_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 mini-test:    $(MINI-TEST-OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 avahi.o avahi-test.o:	CFLAGS += $(shell pkg-config --cflags avahi-core) -MMD -MP
 
 avahi-test:	$(AVAHI-TEST_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs avahi-core) $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs avahi-core) $(LIBS)
 
 echo-test:	$(ECHO-TEST-OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 dgram-test:	$(DGRAM-TEST-OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(QUIET_CC) $(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 ts-test.c:	time-test-inc.c time-test.c
 	cat time-test-inc.c >$@
 	echo '#include "ts-util.h"' >>$@
-	$(CPP) -P -DGEN_TS=1 time-test.c | indent -linux >>$@
+	$(QUIET_CC) $(CPP) -P -DGEN_TS=1 time-test.c | indent -linux >>$@
 
 tv-test.c:	time-test-inc.c time-test.c
 	cat time-test-inc.c >$@
 	echo '#include "tv-util.h"' >>$@
-	$(CPP) -P -DGEN_TV=1 time-test.c | indent -linux >>$@
+	$(QUIET_CC) $(CPP) -P -DGEN_TV=1 time-test.c | indent -linux >>$@
 
 clean:
-	$(RM) *.o *~ *.d *-mock *-test
+	$(RM) *.o *~ *.d *-mock *-test *.out
 
 include $(wildcard $(OBJS:.o=.d))
 
@@ -73,6 +86,6 @@ include $(wildcard $(OBJS:.o=.d))
 COLON:=:
 .SECONDEXPANSION:
 %-mock:	%.o %.o.wrap $$($$@_OBJDEPS) $$($$@_TESTDEPS) $$($$@_TESTDEPS$$(COLON).o=.o.wrap) Makefile
-	$(CC) $(CFLAGS) -o $@ $(LDFLAGS) $< $($@_TESTDEPS) $($@_OBJDEPS) $(EXT_OBJS) \
+	$(QUIET_CC) $(CC) $(CFLAGS) -o $@ $(LDFLAGS) $< $($@_TESTDEPS) $($@_OBJDEPS) $(EXT_OBJS) \
 		$(LIBS) -lcmocka $($@_LIBDEPS) \
 		$(shell cat $<.wrap) $(foreach dep,$($@_TESTDEPS),$(shell cat $(dep).wrap))

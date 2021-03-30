@@ -23,15 +23,24 @@ LIB := libminivent.so
 STATIC := libminivent.a
 OBJS = $(LIBEV_OBJS)
 
+ifneq ($(findstring $(MAKEFLAGS),s),s)
+ifndef V
+	QUIET_CC	= @echo '   ' CC $@;
+	QUIET_AR	= @echo '   ' AR $@;
+endif
+endif
+
 .PHONY:	test
+.c.o:
+	$(QUIET_CC) $(CC) $(CFLAGS) -c -o $@ $<
 
 $(LIB):	$(LIBEV_OBJS)
-	$(CC) $(LDFLAGS) -shared -o $@ $^
+	$(QUIET_CC) $(CC) $(LDFLAGS) -shared -o $@ $^
 
 static:	$(STATIC)
 
 $(STATIC):	$(LIBEV_OBJS)
-	$(AR) r $@ $^
+	$(QUIET_AR) $(AR) cr $@ $^
 
 ts-util.c:	time-inc.c time-util.c
 	cat time-inc.c >$@
